@@ -107,7 +107,7 @@ Drop table skladiste;
 prikazuje detalje o zaposlenicima
 
 - primarni kljuc je id tipa integer
-- oib je unique i limitiran na 11 znakova
+- oib je unique i limitiran na 11 znakova te ima isti check da provjerava da je duzina oiba 11 
 - datum_zaposlenja je tipa datum
 - id_skladiste tipa integer referencira se na skladiste(id) kao FOREIGN KEY
 - id_vrsta_posla tipa integer referencira se na vrsta_posla(id) kao FOREIGN KEY
@@ -122,9 +122,68 @@ datum_zaposlenja DATE NOT NULL,
 ID_skladiste INT ,
 ID_vrsta_posla INT, 
 PRIMARY KEY (ID),
+check (length(oib) = 11),
 FOREIGN KEY (id_skladiste) REFERENCES  skladiste(id),
 FOREIGN KEY (id_vrsta_posla) REFERENCES vrsta_posla(id)
 );
 Drop table zaposlenik;
+```
+
+**Relacija racun**:
+prikaz racuna izdanih sa odredenom firmom
+
+- primarni kljuc je id tipa integer
+- id_zaposlenik tipa integer referencira se na zaposlenik(id) kao FOREIGN KEY
+- id_firma tipa integer referencira se na firma(id) kao FOREIGN KEY
+
+```mysql
+CREATE TABLE racun(
+ID INTEGER NOT NULL,
+ID_zaposlenik INT , 
+datum_izdavanja DATE NOT NULL, 
+ID_firma INT, 
+PRIMARY KEY (ID),
+FOREIGN KEY (id_zaposlenik) REFERENCES zaposlenik(id),
+FOREIGN KEY (id_firma) REFERENCES firma(id)
+);
+Drop table racun;
+```
+
+**Relacija artikl**:
+detalji artikala
+
+- primarni kljuc je id tipa integer
+- cijena je decimal i ima check koji provjerava da cijena ne prelazi 5000 i da ne ide ispod nule
+
+```mysql
+CREATE TABLE artikl(
+ID INTEGER NOT NULL,
+cijena DECIMAL(10,2) NOT NULL, 
+naziv VARCHAR(20) NOT NULL,
+vrsta_artikla VARCHAR(30) NOT NULL, 
+PRIMARY KEY (ID),
+check (cijena < 5000 AND cijena >= 0 )
+);
+Drop table artikl;
+```
+**Relacija stavka_racun**:
+prikaz artikala koji su bili na racun
+
+- primarni kljuc je id tipa integer
+- id_racun tipa integer referencira se na racun(id) kao FOREIGN KEY
+- id_artikl tipa integer referencira se na artikl(id) kao FOREIGN KEY
+- kolicina tipa integer i ima check koji provjerava da kolicina ne prelazi 50 i da ne ide ispod nule
+
+ ```mysql
+CREATE TABLE stavka_racun(
+ID INTEGER NOT NULL,
+ID_racun INT , 
+ID_artikl INT , 
+kolicina INT NOT NULL CHECK (kolicina < 50 AND kolicina >= 0), 
+PRIMARY KEY (ID),
+FOREIGN KEY (id_racun) REFERENCES racun(id) ON DELETE CASCADE,
+FOREIGN KEY (id_artikl) REFERENCES artikl(id)
+);
+Drop table stavka_racun;
 ```
 
