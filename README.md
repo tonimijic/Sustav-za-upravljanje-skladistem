@@ -47,7 +47,7 @@ Drop table adresa;
 **Relacija vrsta_posla**:
 Vrste posla u skladistima
 
--primarni kljuc je id tipa integer
+- primarni kljuc je id tipa integer
 - naziv,duznost,radno_vrijeme ,opis su sve tipa varchar
 
 ```mysql
