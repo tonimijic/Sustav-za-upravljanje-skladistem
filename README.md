@@ -503,6 +503,171 @@ FOREIGN KEY (id_izdatnica) REFERENCES izdatnica(id)
 Drop table povratno;
 ```
 
+## Robert Vidaković
+## Funkcije
+
+
+Funkcije su blokovi koda koji se mogu ponovno iskoristiti te obaviti određene zadatke. One se koriste za izvođenje operacija na podacima ili vraćanje određenih vrijednosti. MySQL podržava različite vrste funkcija, ugrađene funkcije i korisnički definirane funkcije.
+
+**1.	Funkcija – Provjera dostupnosti proizvoda**
+
+```sql
+DROP FUNCTION dostupnost_proizvoda_na_skladistu;
+DELIMITER //
+CREATE FUNCTION dostupnost_proizvoda_na_skladistu(skladiste_ID INTEGER, artikl_ID INTEGER) RETURNS VARCHAR(50)
+DETERMINISTIC
+BEGIN
+    DECLARE dostupna_kolicina INTEGER;
+
+    SELECT COALESCE(SUM(aus.kolicina), 0) INTO dostupna_kolicina
+    FROM artikli_u_skladistu aus
+    WHERE aus.ID_skladiste = skladiste_ID AND aus.ID_artikl = artikl_ID;
+	
+    IF dostupna_kolicina > 0 THEN
+        RETURN CONCAT('Proizvod je dostupan na skladištu: ', dostupna_kolicina, ' komada');
+    ELSE
+        RETURN CONCAT('Proizvod nije dostupan na skladištu: ', dostupna_kolicina, ' komada');
+    END IF;
+END //
+DELIMITER ;
+```
+Ova funkcija provjerava dostupnost proizvoda na skladištu te vraća njihovu količinu.
+
+**DELIMITER //** postavlja delimiter za definiciju funkcije. Definiramo tijelo funkcije unutar bloka između **DELIMITER //** i **DELIMITER ;**.
+
+Pomoću linije **CREATE FUNCTION dostupnost_proizvoda_na_skladistu(skladiste_ID INTEGER, artikl_ID INTEGER) RETURNS VARCHAR(50)** definiramo funkciju s dva ulazna parametra: **skladiste_ID** i **artikl_ID** tipa INTEGER koja vraća vrijednost tipa VARCHAR(50).
+
+Funkcija daje deterministički rezultat, što znači da će s istim ulaznim vrijednostima uvijek proizvesti isti rezultat. **BEGIN** i **END //** određuju početak i kraj funkcije.
+
+Deklariramo varijablu **dostupna_kolicina** koja će pohraniti rezultat upita. SELECT upit koristi **COALESCE** funkciju kako bi osigurao da se, u slučaju nedostatka podataka, vrijednost postavi na nulu. Zatim dohvaća količinu proizvoda na određenom skladištu iz tablice **artikli_u_skladistu**.
+
+Nakon što smo dobili rezultate, funkcija provjerava je li količina veća od nula. Ako jest, vraća poruku koja informira korisnika da je proizvod dostupan na skladištu s točnim brojem dostupnih komada. U suprotnom, vraća poruku da proizvod nije dostupan.
+
+Funkciju pozivamo sa naredbom:
+```sql
+SELECT dostupnost_proizvoda_na_skladistu(2, 2) AS dostupna_kolicina;
+``` 
+
+<br>
+
+**2.	Funkcija – Broj zaposlenika određenog skladišta**
+
+```sql
+DELIMITER //
+CREATE FUNCTION zaposlenici_u_skladistu(skladiste_ID INTEGER) RETURNS INTEGER
+DETERMINISTIC
+BEGIN
+    DECLARE broj_zaposlenika INTEGER;
+    SELECT COUNT(*) INTO broj_zaposlenika
+    FROM zaposlenik
+    WHERE ID_skladiste = skladiste_ID;
+    RETURN broj_zaposlenika;
+END //
+DELIMITER ;
+```
+Ova funkcija vraća broj zaposlenika određenog skladišta.
+
+Funkcija započinje definicijom parametra **skladiste_ID** tipa INTEGER, što omogućuje korisniku da odabere skladište za koje želi dobiti informacije o broju zaposlenika.
+
+Unutar tijela funkcije, deklariramo varijablu **broj_zaposlenika** tipa INTEGER koja će pohraniti rezultat upita. SELECT upit broji zaposlenike u tablici zaposlenik gdje **ID_skladiste** odgovara zadanoj vrijednosti **skladiste_ID**. Dobiveni rezultat se pohranjuje u varijablu **broj_zaposlenika**.
+
+Primjer poziva funkcije: 
+```sql
+SELECT zaposlenici_u_skladistu(2) AS broj_zaposlenika;.
+```
+
+<br>
+
+**3.	Funkcija – Sveukupan iznos računa**
+
+```sql
+DELIMITER //
+CREATE FUNCTION sveukupan_iznos_računa(racun_ID INTEGER) RETURNS DECIMAL(10, 2)
+DETERMINISTIC
+BEGIN
+    DECLARE sveukupno DECIMAL(10, 2);
+    SELECT SUM(a.cijena * sr.kolicina) INTO sveukupno
+    FROM stavka_racun sr
+    JOIN artikl a ON sr.ID_artikl = a.ID
+    WHERE sr.ID_racun = racun_ID;
+    RETURN sveukupno;
+END //
+DELIMITER ;
+```
+Ova funkcija vraća sveukupan iznos određenog računa.
+
+Definicija parametra **racun_ID** tipa INTEGER omogućuje korisniku specificiranje računa za koji želi dobiti informacije. Kao i u prošlim funkcijama, označavamo da funkcija daje deterministički rezultat.
+
+Deklariramo varijablu sveukupno tipa **DECIMAL(10, 2)** koja će pohraniti rezultat. Zatim, koristimo **SUM** funkciju kako bi izračunali ukupnu cijenu svih stavki na određenom računu. Rezultat se pohranjuje u varijablu **sveukupno**. U upitu koristimo JOIN operaciju kako bi povezali tablicu ***stavka_racun*** s tablicom **artikl** prema odgovarajućim ID-jevima. Nakon dobivanja rezultata, funkcija koristi RETURN naredbu kako bi vratila iznos računa.
+
+Primjer poziva funkcije: 
+```sql
+SELECT sveukupan_iznos_racuna(5) AS iznos_racuna;
+```
+
+<br>
+
+**4.	Funkcija -  Količinu proizvoda prodanih u određenom razdoblju**
+
+```sql
+DELIMITER //
+CREATE FUNCTION sveukupna_kolicina_prodanih_proizvoda(pocetni_datum DATE, krajnji_datum DATE) RETURNS INTEGER
+DETERMINISTIC
+BEGIN
+    DECLARE sveukupna_kolicina INTEGER;
+    SELECT SUM(sr.kolicina) INTO sveukupna_kolicina
+    FROM stavka_racun sr
+    JOIN racun r ON sr.ID_racun = r.ID
+    WHERE r.datum_izdavanja BETWEEN pocetni_datum AND krajnji_datum;
+    RETURN sveukupna_kolicina;
+END //
+DELIMITER ;
+```
+Ova funkcija vraća ukupnu količinu proizvoda prodanih u određenom vremenskom razdoblju.
+
+U funkciji imamo dva parametra, **pocetni_datum** i **krajnji_datum**, oba su tipa **DATE**. DATE označava kalendarski datum, a uključuje godinu, mjesec i dan u mjesecu. Na primjer, **'2024-01-10'** predstavlja 10. siječnja 2024. godine.
+
+Deklariramo varijablu **sveukupna_kolicina** tipa INTEGER koja će pohraniti rezultat izračuna. **SELECT SUM(sr.kolicina) INTO sveukupna_kolicina FROM stavka_racun sr JOIN racun r ON sr.ID_racun = r.ID WHERE r.datum_izdavanja BETWEEN pocetni_datum AND krajnji_datum;** izračunava ukupnu količinu proizvoda tako što sumira količinu proizvoda iz tablice **stavka_racun** gdje se pridružuju podaci iz tablice **racun** prema ID-jevima računa, datum izdavanja računa između pocetni_datum i krajnji_datum (uključuju se i ta razdoblja). Rezultat će se pohraniti u varijablu **sveukupna_kolicina**.
+
+Primjer poziva funkcije: 
+```sql
+SELECT sveukupna_kolicina_prodanih_proizvoda('2021-01-01', '2021-12-31') AS prodana_kolicina;
+```
+
+<br>
+
+**5.	Funkcija – Zaposlenik s najviše radnog staža**
+```sql
+DELIMITER //
+CREATE FUNCTION zaposlenik_s_najvise_radnog_staza(skladiste_ID INTEGER) RETURNS VARCHAR(60)
+DETERMINISTIC
+BEGIN
+    DECLARE najduze_zaposlen VARCHAR(60);
+    SELECT CONCAT(ime, ' ', prezime) INTO najduze_zaposlen
+    FROM zaposlenik
+    WHERE ID_skladiste = skladiste_ID
+    ORDER BY datum_zaposlenja ASC
+    LIMIT 1;
+    RETURN najduze_zaposlen;
+END //
+DELIMITER ;
+```
+Ova funkcija prima ID skladišta kao ulazni parametar i vraća ime i prezime zaposlenika koji ima najduži radni staž u tom skladištu. 
+
+Definiramo funkciju naziva **zaposlenik_s_najvise_radnog_staza** koja ima jedan parametar **skladiste_ID** tipa INTEGER, a vraća niz od 60 znakova. 
+
+Deklariramo varijablu **najduze_zaposlen** tipa VARCHAR(60) koja će se koristiti za pohranu imena i prezimena zaposlenika. Zatim se izvršava upit koji koristi SELECT naredbu kako bi se dohvatilo ime i prezime zaposlenika iz tablice zaposlenik. Naredba **CONCAT(ime, ' ', prezime)** spaja ime i prezime zaposlenika u jedan niz, te se pomoću **ORDER BY datum_zaposlenja ASC** rezultati sortiraju prema datumu zaposlenja uzlazno. **LIMIT 1** ograničava rezultate na samo jedan redak, odnosno zaposlenika s najdužim radnim stažem.
+
+Primjer poziva funkcije: 
+```sql
+SELECT zaposlenik_s_najvise_radnog_staza(3);
+```
+
+<br>
+
+
+## Toni Mijić
+
 ### PROCEDURE
 
 ##### Procedura 1
