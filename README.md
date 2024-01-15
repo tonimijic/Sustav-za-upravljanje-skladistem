@@ -315,7 +315,7 @@ Drop table povratno;
  Prva procedura je jednostavni primjer koja vraca firmu s kojom se najvise posluje do sada i ima jedan izlazni parametar
  procedura nema nijedan ulazni parametar
 
-```
+```mysql
 DELIMITER //
 
 CREATE PROCEDURE najvaznija_firma(OUT najvise_poslujuca_firma VARCHAR(50))
@@ -340,7 +340,7 @@ SELECT @rezultat AS 'najvaznija_firma';
 Druga procedura je jednostavni  prikaz skladista s najvecom kolicinom artikala tako da bismo znali koje skladiste treba izbjegavati puniti artiklima ako je potrebno
 nema ulaznih ni izlaznih parametara
 
-```
+```mysql
 DELIMITER //
 
 CREATE PROCEDURE prikaz_najpunijeg_skladista()
@@ -373,7 +373,7 @@ CALL prikaz_najpunijeg_skladista();
 Treca prcoedura pronalazi najvrijednijeg radnika i dodjeljuje mu vip ulogu ima jedna ulazno/izlazni parametar 
 Koristimo 2 pomocne varijable u koje cemo spremiti zaposlenika s najvise racuna te u drugu spremamo vip naziv
 
-```
+```mysql
 DELIMITER //
 CREATE PROCEDURE dodaj_nagradu_zaposleniku(INOUT vip_id INT)
 BEGIN
@@ -412,7 +412,7 @@ SELECT @zaposlenik_id;
 Cetvrta procedura je jednostavna procedura koja nam provjerava da li je odredeni artikl u odredenom skladistu postojeci i koja je kolicina
 ima 2 ulazna i 3 izlazna parametra 
 
-```
+```mysql
 DELIMITER //
 CREATE PROCEDURE Provjera_artikala_u_skladistu(IN skladiste_id INT, IN artikl_id INT,OUT naziv_artikla VARCHAR(50), OUT artiklPostoji INT, OUT broj_artikala INT)
 BEGIN
@@ -441,7 +441,8 @@ SELECT @naziv_artikala AS NazivArtikla ,@artiklPostoji AS ArtiklPostoji,  @broj_
 
 Peta procedura je jednostavna procedura koja provjerava koje se skladiste najcesce koristi da vidimo u koje treba najbolja kvaliteta ljudi radi najvise posla
 nema ulaznih ni izlaznih parametara
-```
+
+```mysql
 DROP PROCEDURE IF EXISTS NajcesceKoristenoSkladiste;
 
 DELIMITER //
@@ -473,7 +474,7 @@ CALL NajcesceKoristenoSkladiste();
 Sesta procedura salje iste artikle u skladista u koja mi odaberemo radi lakseg kontroliranja artikala po skladistima 
 ima 2 ulazna parametra 
 
-```
+```mysql
 DELIMITER //
 CREATE PROCEDURE prijenos_artikala(IN p_id_artikl INT, IN p_id_odrediste INT)
 BEGIN
@@ -494,7 +495,7 @@ SELECT * FROM artikli_u_skladistu WHERE id_skladiste = 1;
 Sedma procedura  zbraja odredene iste artikle nakon prebacivanja u skladiste tako da se sve svrstava pod jedno 
 ima jedan ulazni parametar 
 
-```
+```mysql
 DELIMITER //
 CREATE PROCEDURE spoji_artikle(p_id_skladiste INT)
 BEGIN
@@ -529,7 +530,7 @@ WHERE aus.ID_skladiste = 1;
 Osma procedura stavlja popust od 20% na sve proizvode  koji se nikada nisu prodali
 nema ulaznih niti izlaznih parametara
 
-```
+```mysql
 DELIMITER //
 CREATE PROCEDURE popust_ne_prodani()
 BEGIN
@@ -548,7 +549,8 @@ SELECT * FROM artikl;
 
 Deveta procedura provjerava da li je dovoljno zaposlenika u odredenim skladistima i ako nije javlja gresku
 ima jedan ulazni parametar 
-```
+
+```mysql
 DROP PROCEDURE IF EXISTS provjeri_radnike;
 
 DELIMITER //
@@ -583,7 +585,7 @@ CALL provjeri_radnike(5);
 Deseta procedura  prebacuje zaposlenike u druga skladista ovisno o potrebama firme tj. nadopunjujemo proslu proceduru koja nam radi provjeru
 ima dva ulazna parametra 
 
-```
+```mysql
 DROP PROCEDURE IF EXISTS promjeni_radno_mjesto;
 
 
