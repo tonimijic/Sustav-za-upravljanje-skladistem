@@ -307,3 +307,315 @@ FOREIGN KEY (id_izdatnica) REFERENCES izdatnica(id)
 );
 Drop table povratno;
 ```
+
+### PROCEDURE
+
+##### Procedura 1
+
+ Prva procedura je jednostavni primjer koja vraca firmu s kojom se najvise posluje do sada i ima jedan izlazni parametar
+ procedura nema nijedan ulazni parametar
+
+```
+DELIMITER //
+
+CREATE PROCEDURE najvaznija_firma(OUT najvise_poslujuca_firma VARCHAR(50))
+BEGIN
+    SELECT firma.naziv
+    INTO najvise_poslujuca_firma
+    FROM firma
+    JOIN racun ON firma.id = racun.id_firma
+    GROUP BY firma.naziv
+    ORDER BY COUNT(racun.id) DESC
+    LIMIT 1;
+END //
+
+DELIMITER ;
+
+CALL najvaznija_firma(@rezultat);
+SELECT @rezultat AS 'najvaznija_firma';
+```
+
+##### Procedura 2
+
+Druga procedura je jednostavni  prikaz skladista s najvecom kolicinom artikala tako da bismo znali koje skladiste treba izbjegavati puniti artiklima ako je potrebno
+nema ulaznih ni izlaznih parametara
+
+```
+DELIMITER //
+
+CREATE PROCEDURE prikaz_najpunijeg_skladista()
+BEGIN
+
+    DECLARE skl_naziv VARCHAR(50);
+
+
+    SELECT naziv INTO skl_naziv
+    FROM (
+        SELECT s.naziv, SUM(sa.kolicina) AS sveukupna_kolicina
+        FROM skladiste s
+        JOIN artikli_u_skladistu sa ON s.id = sa.id_skladiste
+        GROUP BY s.id
+        ORDER BY sveukupna_kolicina DESC
+        LIMIT 1
+    ) AS skladista;
+
+    SELECT skl_naziv AS naziv_skladista;
+END //
+
+DELIMITER ;
+
+CALL prikaz_najpunijeg_skladista();
+```
+
+##### Procedura 3
+
+
+Treca prcoedura pronalazi najvrijednijeg radnika i dodjeljuje mu vip ulogu ima jedna ulazno/izlazni parametar 
+Koristimo 2 pomocne varijable u koje cemo spremiti zaposlenika s najvise racuna te u drugu spremamo vip naziv
+
+```
+DELIMITER //
+CREATE PROCEDURE dodaj_nagradu_zaposleniku(INOUT vip_id INT)
+BEGIN
+    DECLARE najaktivniji_id INT;
+    DECLARE vip_ime VARCHAR(60);
+
+    SELECT id_zaposlenik INTO najaktivniji_id
+    FROM (
+        SELECT id_zaposlenik, COUNT(*) AS broj_racuna
+        FROM racun
+        WHERE YEAR(datum_izdavanja) = YEAR(CURRENT_DATE - INTERVAL 1 YEAR)
+        GROUP BY id_zaposlenik
+        ORDER BY broj_racuna DESC
+        LIMIT 1
+    ) AS najaktivniji;
+
+    SET vip_id = najaktivniji_id;
+
+    SELECT CONCAT('VIP ', ime) INTO vip_ime
+    FROM zaposlenik
+    WHERE ID = vip_id;
+
+    UPDATE zaposlenik
+    SET ime = vip_ime
+    WHERE ID = vip_id;
+END //
+DELIMITER ;
+
+SET @zaposlenik_id = 0;
+CALL dodaj_nagradu_zaposleniku(@zaposlenik_id);
+SELECT @zaposlenik_id;
+```
+
+##### Procedura 4
+
+Cetvrta procedura je jednostavna procedura koja nam provjerava da li je odredeni artikl u odredenom skladistu postojeci i koja je kolicina
+ima 2 ulazna i 3 izlazna parametra 
+
+```
+DELIMITER //
+CREATE PROCEDURE Provjera_artikala_u_skladistu(IN skladiste_id INT, IN artikl_id INT,OUT naziv_artikla VARCHAR(50), OUT artiklPostoji INT, OUT broj_artikala INT)
+BEGIN
+
+    SELECT a.naziv, aus.kolicina INTO naziv_artikla, broj_artikala
+    FROM artikl a
+    LEFT JOIN artikli_u_skladistu AS aus ON a.id = aus.id_artikl
+    WHERE aus.id_skladiste = skladiste_id AND aus.id_artikl = artikl_id;
+
+
+    IF broj_artikala > 0 THEN
+        SET artiklPostoji = 1;
+    ELSE
+        SET artiklPostoji = 0 ;
+    END IF;
+END //
+
+DELIMITER ;
+
+CALL Provjera_artikala_u_skladistu(1, 10,@naziv_artikala ,@artiklPostoji, @broj_artikala);
+SELECT @naziv_artikala AS NazivArtikla ,@artiklPostoji AS ArtiklPostoji,  @broj_artikala AS Kolicina;
+```
+
+
+##### Procedura 5 
+
+Peta procedura je jednostavna procedura koja provjerava koje se skladiste najcesce koristi da vidimo u koje treba najbolja kvaliteta ljudi radi najvise posla
+nema ulaznih ni izlaznih parametara
+```
+DROP PROCEDURE IF EXISTS NajcesceKoristenoSkladiste;
+
+DELIMITER //
+
+CREATE PROCEDURE NajcesceKoristenoSkladiste ()
+BEGIN
+  SELECT
+    s.ID AS ID_skladista,
+    s.naziv AS Naziv_skladista,
+    COUNT(i.ID) AS Broj_izdatnica
+  FROM
+    skladiste s
+    LEFT JOIN zaposlenik z ON s.ID = z.ID_skladiste
+    LEFT JOIN izdatnica i ON z.ID = i.ID_zaposlenik
+  GROUP BY
+    s.ID
+  ORDER BY
+    Broj_izdatnica DESC
+  LIMIT 1;
+END //
+
+DELIMITER ;
+
+CALL NajcesceKoristenoSkladiste();
+```
+
+
+##### Procedura 6
+Sesta procedura salje iste artikle u skladista u koja mi odaberemo radi lakseg kontroliranja artikala po skladistima 
+ima 2 ulazna parametra 
+
+```
+DELIMITER //
+CREATE PROCEDURE prijenos_artikala(IN p_id_artikl INT, IN p_id_odrediste INT)
+BEGIN
+
+    UPDATE artikli_u_skladistu AS a
+    JOIN skladiste AS s ON a.id_skladiste = s.id
+    SET a.id_skladiste = p_id_odrediste
+    WHERE a.id_artikl = p_id_artikl AND s.id != p_id_odrediste;
+END //
+DELIMITER ;
+
+CALL prijenos_artikala(1, 1);
+SELECT * FROM artikli_u_skladistu WHERE id_skladiste = 1;
+```
+
+##### Procedura 7
+
+Sedma procedura  zbraja odredene iste artikle nakon prebacivanja u skladiste tako da se sve svrstava pod jedno 
+ima jedan ulazni parametar 
+
+```
+DELIMITER //
+CREATE PROCEDURE spoji_artikle(p_id_skladiste INT)
+BEGIN
+
+    UPDATE artikli_u_skladistu AS a1
+    JOIN (
+        SELECT id_artikl,id_skladiste, SUM(kolicina) AS ukupna_kolicina
+        FROM artikli_u_skladistu
+        WHERE id_skladiste = p_id_skladiste
+        GROUP BY id_artikl, id_skladiste)
+        AS a2 ON a1.id_artikl = a2.id_artikl AND a1.id_skladiste = a2.id_skladiste
+    SET a1.kolicina = a2.ukupna_kolicina
+    WHERE a1.id_artikl IS NOT NULL AND a1.id_skladiste IS NOT NULL AND a1.id_skladiste = p_id_skladiste;
+
+    DELETE a1 FROM artikli_u_skladistu a1
+    INNER JOIN artikli_u_skladistu a2
+    WHERE a1.id_artikl = a2.id_artikl AND a1.id_skladiste = a2.id_skladiste AND a1.id< a2.ID AND a1.id_skladiste = p_id_skladiste;
+END //
+DELIMITER ;
+
+
+CALL spoji_artikle(1);
+
+SELECT aus.ID, aus.ID_skladiste, s.naziv AS skladiste, aus.ID_artikl, a.naziv AS artikl, aus.kolicina
+FROM artikli_u_skladistu aus
+JOIN skladiste s ON aus.ID_skladiste = s.ID
+JOIN artikl a ON aus.ID_artikl = a.ID
+WHERE aus.ID_skladiste = 1;
+```
+
+##### Procedura 8 
+Osma procedura stavlja popust od 20% na sve proizvode  koji se nikada nisu prodali
+nema ulaznih niti izlaznih parametara
+
+```
+DELIMITER //
+CREATE PROCEDURE popust_ne_prodani()
+BEGIN
+    UPDATE artikl
+    SET cijena = cijena * 0.8
+    WHERE id NOT IN (SELECT DISTINCT id_artikl FROM stavka_racun);
+END //
+DELIMITER ;
+
+CALL popust_ne_prodani();
+SELECT * FROM artikl;
+```
+
+
+##### Procedura 9
+
+Deveta procedura provjerava da li je dovoljno zaposlenika u odredenim skladistima i ako nije javlja gresku
+ima jedan ulazni parametar 
+```
+DROP PROCEDURE IF EXISTS provjeri_radnike;
+
+DELIMITER //
+
+CREATE PROCEDURE provjeri_radnike (IN p_id_skladiste INT)
+BEGIN
+  DECLARE broj_radnika INT;
+
+  -- Provjeri broj radnika u određenom skladištu
+  SELECT COUNT(*) INTO broj_radnika
+  FROM zaposlenik
+  WHERE id_skladiste = p_id_skladiste;
+
+  -- Ako ima manje od 5 radnika, generiraj grešku
+  IF broj_radnika < 5 THEN
+    SIGNAL SQLSTATE '45000'
+    SET MESSAGE_TEXT = 'Skladište ima manje od 5 radnika, potrebno je dodati radnike';
+  -- Ako ima više od 10 radnika, generiraj grešku
+  ELSEIF broj_radnika > 10 THEN
+    SIGNAL SQLSTATE '45000'
+    SET MESSAGE_TEXT = 'Skladište ima više od 10 radnika, previše radnika u skladištu';
+  END IF;
+END //
+
+DELIMITER ;
+
+CALL provjeri_radnike(5);
+```
+
+##### Procedura 10 
+
+Deseta procedura  prebacuje zaposlenike u druga skladista ovisno o potrebama firme tj. nadopunjujemo proslu proceduru koja nam radi provjeru
+ima dva ulazna parametra 
+
+```
+DROP PROCEDURE IF EXISTS promjeni_radno_mjesto;
+
+
+DELIMITER //
+CREATE PROCEDURE promjeni_radno_mjesto (
+  IN p_id_zaposlenik INT,
+  IN p_novo_skladiste INT
+)
+BEGIN
+  -- Provjeri postoji li zaposlenik s zadanim ID-om
+  IF NOT EXISTS (SELECT 1 FROM zaposlenik WHERE ID = p_id_zaposlenik) THEN
+    SIGNAL SQLSTATE '45000'
+    SET MESSAGE_TEXT = 'Zaposlenik s zadanim ID-om ne postoji';
+
+  END IF;
+
+  -- Provjeri postoji li skladište s zadanim ID-om
+  IF NOT EXISTS (SELECT 1 FROM skladiste WHERE ID = p_novo_skladiste) THEN
+    SIGNAL SQLSTATE '45000'
+    SET MESSAGE_TEXT = 'Skladište s zadanim ID-om ne postoji';
+
+  END IF;
+
+  -- Ažuriraj skladište zaposlenika
+  UPDATE zaposlenik
+  SET ID_skladiste = p_novo_skladiste
+  WHERE ID = p_id_zaposlenik;
+END //
+
+DELIMITER ;
+
+CALL promjeni_radno_mjesto(1, 3);
+
+select* from zaposlenik;
+```
