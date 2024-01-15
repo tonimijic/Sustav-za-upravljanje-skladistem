@@ -1,6 +1,0 @@
-id,naziv,duznost,radno_vrijeme, opis
-1, Direktor, CEO servisa, 8:00-15:00,Dogovaranje novih poslova - briga o firmi),
-2, Voditelj, Menadžer skladišta, '8:00-15:00',Nadziranje radnika-upravljanje Poslovnice servisom),
-3, Dostavljac, 'dostava robe, 8:00-15:00,Dostava robe kupcima),
-4, Blagajnik, Rad u skladištu', '8:00-15:00','primatelj robe-izdavanje racuna),
-5, Skladistar, Rad u skladištu, 8:00-15:00,Pakiranje robe-kontrola proizvoda-slaganje proizvoda);
