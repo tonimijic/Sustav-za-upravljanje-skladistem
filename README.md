@@ -7,7 +7,7 @@ projekt baze podataka 2
 **Relacija drzava**:
 sve drzave koje se koriste za skladiste
 
-- id podataka tipa integer ,primarni ključ
+- id podataka tipa integer,primarni kljuc
 - skracenica podatak tipa char limitiran na 3 znaka
 - naziv podatak tipa varchar limitiran na 20 znakova
 - glavni_grad podatak tipa varchar limitiran na 30 znakova
@@ -27,9 +27,9 @@ Drop table drzava;
 prikazuje adrese koje se koriste za skladiste
 
 - primarni kljuc je id tipa integer
--id_drzava tipa integer referencira se na drzava(id) kao FOREIGN KEY
--naziv,grad su tipa varchar
--postanski_broj tipa integer i ima check koji provjerava da broj ne ide u nedogled vec do 100 000
+- id_drzava tipa integer referencira se na drzava(id) kao FOREIGN KEY
+- naziv,grad su tipa varchar
+- postanski_broj tipa integer i ima check koji provjerava da broj ne ide u nedogled vec do 100 000
 
 ```mysql
 CREATE TABLE adresa(
