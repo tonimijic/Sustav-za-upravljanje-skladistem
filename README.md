@@ -503,6 +503,239 @@ FOREIGN KEY (id_izdatnica) REFERENCES izdatnica(id)
 Drop table povratno;
 ```
 
+## Mateo Smoljan
+
+## Upiti
+
+
+#### Upit u MySQLu predstavlja strukturiranu naredbu koja se koristi za dohvaćanje, ažuriranje, unos ili brisanje podataka iz baze podataka, koristeći SQL jezik.
+
+1. Upit daje informacije o prosječnom stažu zaposlenika, broju zaposlenika te ukupnom broju izdanih računa po firmama, uzimajući u obzir samo zaposlenike koji su se zaposlili prije 2022. godine.
+```sql
+SELECT firma.naziv AS 'Firma', COUNT(DISTINCT zaposlenik.ID) AS 'Broj_zaposlenika', 
+       AVG(DATEDIFF('2024-01-03', zaposlenik.datum_zaposlenja)/365) AS 'Prosjecna_staz', 
+       SUM(racun.ID IS NOT NULL) AS 'Broj_izdanih_racuna'
+FROM firma
+JOIN skladiste ON firma.ID = skladiste.ID_firma
+JOIN zaposlenik ON skladiste.ID = zaposlenik.ID_skladiste
+LEFT JOIN racun ON zaposlenik.ID = racun.ID_zaposlenik
+WHERE YEAR(zaposlenik.datum_zaposlenja) <= 2022
+GROUP BY firma.naziv
+ORDER BY Broj_izdanih_racuna DESC, Broj_zaposlenika DESC;
+```
+2. Upit dohvaća državu s najvišom ukupnom vrijednošću izdanih računa.
+```sql
+SELECT drzava.naziv AS drzava, 
+       SUM(artikl.cijena * stavka_racun.kolicina) AS ukupna_vrijednost_racuna
+FROM drzava
+JOIN adresa ON drzava.ID = adresa.id_drzava
+JOIN firma ON adresa.ID = firma.ID_adresa
+JOIN skladiste ON firma.ID = skladiste.ID_firma
+JOIN zaposlenik ON skladiste.ID = zaposlenik.ID_skladiste
+JOIN racun ON zaposlenik.ID = racun.ID_zaposlenik
+JOIN stavka_racun ON racun.ID = stavka_racun.ID_racun
+JOIN artikl ON stavka_racun.ID_artikl = artikl.ID
+GROUP BY drzava.naziv
+ORDER BY ukupna_vrijednost_racuna DESC
+LIMIT 1;
+```
+
+3. Dohvatća artikle čija je količina manja od prosječne količine po skladistu
+```sql
+SELECT a.*, au.kolicina, s.naziv AS naziv_skladista
+FROM artikl a
+JOIN artikli_u_skladistu au ON a.ID = au.ID_artikl
+JOIN skladiste s ON au.ID_skladiste = s.ID
+WHERE au.kolicina < (SELECT AVG(kolicina) FROM artikli_u_skladistu)
+ORDER BY s.naziv, a.naziv;
+```
+
+4. Pronađi dobavljača s najdužim radnim stažem te najviše povratnih informacija
+
+```sql
+SELECT 
+    dobavljac.ID AS id_dobavljac,
+    zaposlenik.ime AS ime_zaposlenika,
+    zaposlenik.prezime AS prezime_zaposlenika,
+    dobavljac.godine_iskustva AS godine_iskustva,
+    COUNT(DISTINCT povratno.id_izdatnica) AS broj_povratnih_informacija
+FROM
+    dobavljac
+        JOIN
+    zaposlenik ON dobavljac.ID_zaposlenik = zaposlenik.ID
+        JOIN
+    izdatnica ON zaposlenik.ID = izdatnica.ID_zaposlenik
+        LEFT JOIN
+    povratno ON izdatnica.ID = povratno.id_izdatnica
+GROUP BY dobavljac.ID
+ORDER BY godine_iskustva DESC , broj_povratnih_informacija DESC
+LIMIT 1;
+```
+
+5. Prikazi sve firme koje imaju više od jednog skladišta, zajedno s brojem skladišta koje posjeduju
+
+```sql
+SELECT firma.naziv AS naziv_firme,
+       COUNT(DISTINCT skladiste.ID) AS broj_skladista
+FROM firma
+JOIN skladiste ON firma.ID = skladiste.ID_firma
+GROUP BY firma.ID
+HAVING broj_skladista > 1;
+```
+
+6. Prikaži sve dostave koje je obavio određeni dostavljač
+
+```sql
+SELECT
+    i.ID AS Dostava_ID,
+    i.datum_dostavljanja AS Datum_Dostave,
+    i.vrijeme_dostavljanja AS Vrijeme_Dostave,
+    z.ime AS Dostavljac_Ime,
+    z.prezime AS Dostavljac_Prezime,
+    k.ime AS Kupac_Ime,
+    k.prezime AS Kupac_Prezime,
+    a.grad AS Adresa_Grad,
+    a.postanski_broj AS Adresa_Postanski_Broj,
+    p.razlog_povratka AS Razlog_Povratka
+FROM
+    izdatnica i
+JOIN
+    zaposlenik z ON i.ID_zaposlenik = z.ID
+JOIN
+    stavka_izdatnica si ON i.ID = si.ID_izdatnica
+JOIN
+    kupac k ON i.ID_kupac = k.ID
+JOIN
+    adresa a ON k.ID_adresa = a.ID
+LEFT JOIN
+    povratno p ON i.ID = p.id_izdatnica
+WHERE
+    i.ID_zaposlenik = 11;
+```
+
+
+7. Pronađi sve pakete koji su dostavljeni s razlogom povratka
+
+```sql
+SELECT i.*, povratno.razlog_povratka
+FROM izdatnica i
+JOIN zaposlenik z ON i.ID_zaposlenik = z.ID
+JOIN povratno ON i.ID = povratno.id_izdatnica;
+```
+
+8. Vrsta posla i ukupan broj zaposlenika koji obavljaju tu vrstu posla
+
+```sql
+SELECT vrsta_posla.naziv AS vrsta_posla,
+       COUNT(zaposlenik.ID) AS ukupan_broj_zaposlenika
+FROM vrsta_posla
+LEFT JOIN zaposlenik ON vrsta_posla.ID = zaposlenik.ID_vrsta_posla
+GROUP BY vrsta_posla.ID;
+```
+
+9. Informacije o zaposlenicima koji su bili uključeni u izdavanje robe za firmu koja je imala povratnu informaciju o nekoj robi
+
+```sql
+SELECT 
+  zaposlenik.ime, 
+  zaposlenik.prezime, 
+  firma.naziv AS naziv_firme, 
+  izdatnica.datum_dostavljanja, 
+  povratno.razlog_povratka
+FROM 
+  zaposlenik
+JOIN 
+  izdatnica ON zaposlenik.ID = izdatnica.ID_zaposlenik
+JOIN 
+  povratno ON izdatnica.ID = povratno.id_izdatnica
+JOIN 
+  firma ON zaposlenik.ID_skladiste = firma.ID
+JOIN 
+  adresa ON firma.ID_adresa = adresa.ID
+WHERE 
+  povratno.razlog_povratka IS NOT NULL
+  AND izdatnica.datum_dostavljanja BETWEEN '2023-01-01' AND '2023-12-31'
+LIMIT 1;
+```
+
+10. Izračunaj ukupnu vrijednost artikala
+
+```sql
+SELECT SUM(cijena * kolicina) AS ukupna_vrijednost
+FROM stavka_racun
+JOIN artikl ON stavka_racun.ID_artikl = artikl.ID;
+```
+
+11. Prikaži sve dostavljače i broj dostava koje su obavili
+
+```sql
+SELECT
+    z.ID AS dostavljac_id,
+    z.ime AS ime_dostavljaca,
+    z.prezime AS prezime_dostavljaca,
+    COUNT(i.ID) AS broj_dostava
+FROM zaposlenik z
+JOIN izdatnica i ON z.ID = i.ID_zaposlenik
+GROUP BY dostavljac_id;
+```
+
+12. Dohvati informacije o stavkama izdatnica, uključujući naziv artikla, količinu, datum i vrijeme dostavljanja, ime i prezime zaposlenika. Podaci su sortirani prema datumu i vremenu dostavljanja u silaznom redoslijedu
+
+```sql
+SELECT si.ID AS 'ID_Stavke', a.naziv AS 'Naziv_Artikla', si.kolicina AS 'Količina', iz.datum_dostavljanja AS 'Datum_Dostavljanja', iz.vrijeme_dostavljanja AS 'Vrijeme_Dostavljanja', z.ime AS 'Ime_Zaposlenika', z.prezime AS 'Prezime_Zaposlenika'
+FROM stavka_izdatnica si
+JOIN artikli_u_skladistu aus ON si.ID_artikli_u_skladistu = aus.ID
+JOIN izdatnica iz ON si.ID_izdatnica = iz.ID
+JOIN artikl a ON aus.ID_artikl = a.ID
+JOIN zaposlenik z ON iz.ID_zaposlenik = z.ID
+ORDER BY iz.datum_dostavljanja DESC, iz.vrijeme_dostavljanja DESC;
+```
+
+13. Prikaži sve razloge povratka koji se odnose na određenog dostavljača
+
+```sql
+SELECT
+    p.ID AS povrat_id,
+    i.ID_zaposlenik AS dostavljac_id,
+    z.ime AS ime_dostavljaca,
+    z.prezime AS prezime_dostavljaca,
+    p.razlog_povratka,
+    p.datum_ponovnog_dostavljanja
+FROM povratno p
+JOIN izdatnica i ON p.id_izdatnica = i.ID
+JOIN zaposlenik z ON i.ID_zaposlenik = z.ID;
+```
+
+14. Izlistaj sve adrese koje imaju više od jednog skladišta
+
+```sql
+SELECT a.*, COUNT(s.ID) AS Broj_skladišta
+FROM adresa a
+JOIN skladiste s ON a.ID = s.ID_adresa
+GROUP BY a.ID
+HAVING Broj_skladišta > 1;
+```
+
+15. Prikazi informacije o zaposlenicima, njihovim skladistima, gradovima i vrsti posla
+
+```sql
+SELECT
+    z.ID AS Zaposlenik_ID,
+    z.ime AS Zaposlenik_Ime,
+    z.prezime AS Zaposlenik_Prezime,
+    z.OIB AS Zaposlenik_OIB,
+    z.datum_zaposlenja AS Zaposlenik_Datum_Zaposlenja,
+    s.naziv AS Skladiste_Naziv,
+    a.grad AS Grad,
+    a.postanski_broj AS Postanski_Broj,
+    vp.naziv AS Vrsta_Posla
+FROM zaposlenik z
+JOIN skladiste s ON z.ID_skladiste = s.ID
+JOIN adresa a ON s.ID_adresa = a.ID
+JOIN vrsta_posla vp ON z.ID_vrsta_posla = vp.ID
+ORDER BY Zaposlenik_ID;
+```
+
 ## Robert Vidaković
 ## Funkcije
 
@@ -1207,3 +1440,64 @@ Ovim upitom računamo ukupan iznos za svaki račun koji se nalazi u privremenoj 
 Uzimamo ID računa i datum izdavanja iz privremene tablice **temp_racun**, ukupni iznos za svaki račun, koji se računa kao zbroj umnoženih cijena artikala iz privremene tablice **temp_artikl** s količinama iz privremene tablice **temp_stavka_racun**. 
 
 Spajamo informacije o stavkama računa iz privremenih tablica **temp_stavka_racun** i **temp_racun** na temelju ID-eva računa. Zatim informacije o artiklima iz privremenih tablica **temp_artikl** i **temp_stavka_racun** na temelju ID-eva artikala te grupiramo rezultate po ID-evima računa i datumima izdavanja.
+
+## Mateo Smoljan
+## Transakcije
+
+#### Transakcije u MySQL predstavljaju skup operacija baza podataka koje se izvršavaju kao jedna logička cjelina, osiguravajući konzistentnost podataka čak i u slučaju neuspjeha tijekom izvršavanja operacija.
+
+1. Povećanje cijena
+
+```mysql
+SELECT @@autocommit;
+SET AUTOCOMMIT = OFF;
+DELIMITER //
+CREATE PROCEDURE povecaj_cijenuu (IN artiklID INT, IN postotak DECIMAL(5,2))
+BEGIN
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        SELECT "Došlo je do greške prilikom izvršavanja procedure.";
+    END;
+
+    SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;
+    START TRANSACTION;
+
+    UPDATE artikl
+    SET cijena = cijena * (1 + postotak/100)
+    WHERE ID = artiklID;
+
+    COMMIT;
+END //
+DELIMITER ;
+
+CALL povecaj_cijenuu(1, 10);
+```
+
+2. Prima zaposlenikID i firmaID te unosi novi redak u tablicu racun s trenutačnim datumom izdavanja
+
+```mysql
+SELECT @@autocommit;
+SET AUTOCOMMIT = OFF;
+DELIMITER //
+CREATE PROCEDURE novi_racun (IN zaposlenikID INT, IN firmaID INT)
+BEGIN
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        SELECT "Došlo je do greške prilikom izvršavanja procedure.";
+    END;
+
+    SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;
+    START TRANSACTION;
+
+    INSERT INTO racun (ID_zaposlenik, datum_izdavanja, ID_firma)
+    VALUES (zaposlenikID, CURDATE(), firmaID);
+
+    COMMIT;
+END //
+DELIMITER ;
+
+CALL novi_racun(1, 5);
+```
+
