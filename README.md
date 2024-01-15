@@ -187,3 +187,123 @@ FOREIGN KEY (id_artikl) REFERENCES artikl(id)
 Drop table stavka_racun;
 ```
 
+**Relacija artikli_u_skladistu**:
+svi artikli koji dolaze se nalaze na ovom popisu
+
+- primarni kljuc je id tipa integer
+- id_skladiste tipa integer referencira se na skladiste(id) kao FOREIGN KEY
+- id_artikl tipa integer referencira se na artikl(id) kao FOREIGN KEY
+- kolicina tipa integer i ima check koji provjerava da kolicina ne prelazi 1000 i da ne ide ispod nule
+
+ ```mysql
+CREATE TABLE artikli_u_skladistu(
+ID INTEGER NOT NULL,
+ID_skladiste INT , 
+ID_artikl INT ,
+kolicina INT CHECK (kolicina < 1000 AND kolicina >= 0), 
+PRIMARY KEY (ID),
+FOREIGN KEY (id_skladiste) REFERENCES skladiste(id),
+FOREIGN KEY (id_artikl) REFERENCES artikl(id)
+);
+Drop table artikli_u_skladistu;
+ ```
+
+**Relacija kupac**:
+detalji o kupcu
+
+- ime,prezime,telefon tipa varchar
+- primarni kljuc je id tipa integer
+- id_adresa tipa integer referencira se na adresa(id) kao FOREIGN KEY
+
+ ```mysql
+CREATE TABLE kupac(
+ID INTEGER NOT NULL,
+ime VARCHAR(40),
+prezime VARCHAR(40),
+ID_adresa INTEGER,
+telefon VARCHAR(20),
+PRIMARY KEY (ID),
+FOREIGN KEY (id_adresa) REFERENCES adresa(id)
+);
+Drop table kupac;
+ ```
+**Relacija izdatnica**:
+racun koji prikazuje kupca i sta je kupljeno
+
+- primarni kljuc je id tipa integer
+- datum i vrijeme dostavljanja su tipa date time
+- id_zaposlenik tipa integer referencira se na zaposlenik(id) kao FOREIGN KEY
+- id_kupac tipa integer referencira se na kupac(id) kao FOREIGN KEY
+
+ ```mysql
+CREATE TABLE izdatnica (
+ID INTEGER NOT NULL,
+datum_dostavljanja DATE NOT NULL,
+vrijeme_dostavljanja TIME NOT NULL,
+ID_zaposlenik INT ,
+ID_kupac INT , 
+PRIMARY KEY (ID),
+FOREIGN KEY (id_zaposlenik) REFERENCES zaposlenik(id),
+FOREIGN KEY (id_kupac) REFERENCES kupac(id)
+);
+Drop table izdatnica;
+ ```
+**Relacija stavka_izdatnica**:
+artikli koji se nalaze na izdatnici
+
+- primarni kljuc je id tipa integer
+- id_izdatnica tipa integer referencira se na izdatnica(id) kao FOREIGN KEY
+- id_artikli_u_skladistu tipa integer referencira se na artikli_u_skladistu(id) kao FOREIGN KEY
+- kolicina tipa integer i ima check koji provjerava da kolicina ne prelazi 25 i da ne ide ispod nule
+
+```mysql
+CREATE TABLE stavka_izdatnica(
+ID INTEGER NOT NULL,
+ID_izdatnica INTEGER ,
+ID_artikli_u_skladistu INTEGER, 
+kolicina INTEGER CHECK (kolicina < 25 AND kolicina >= 0), 
+PRIMARY KEY (ID),
+FOREIGN KEY (id_izdatnica) REFERENCES izdatnica(id),
+FOREIGN KEY (id_artikli_u_skladistu) REFERENCES artikli_u_skladistu(id)
+);
+Drop table stavka_izdatnica
+```
+
+**Relacija dobavljac**:
+bavi se izdatnicom
+
+- primarni kljuc je id tipa integer
+- id_zaposlenik tipa integer referencira se na zaposlenik(id) kao FOREIGN KEY
+- godine iskustva tipa integer i ima check koji provjerava da nema vise od 25 godina iskustva
+
+```mysql
+CREATE TABLE dobavljac(
+ID INTEGER NOT NULL,
+ID_zaposlenik INT,
+vozacka VARCHAR(5),
+godine_iskustva INTEGER CHECK (godine_iskustva < 25 ),
+PRIMARY KEY (ID),
+FOREIGN KEY (id_zaposlenik) REFERENCES zaposlenik(id)
+);
+Drop table dobavljac;
+```
+**Relacija povratno**:
+sve izdatnice koje nisu iz prve dostavljene
+
+- primarni kljuc je id tipa integer
+- id_dobavljac tipa integer referencira se na dobavljac(id) kao FOREIGN KEY
+- id_izdatnica tipa integer referencira se na izdatnica(id) kao FOREIGN KEY
+
+```mysql
+CREATE TABLE povratno(
+ID INTEGER NOT NULL,
+id_dobavljac INT,
+id_izdatnica INT,
+razlog_povratka VARCHAR(50),
+datum_ponovnog_dostavljanja DATE,
+PRIMARY KEY(ID),
+FOREIGN KEY (id_dobavljac) REFERENCES dobavljac(id),
+FOREIGN KEY (id_izdatnica) REFERENCES izdatnica(id)
+);
+Drop table povratno;
+```
