@@ -816,3 +816,229 @@ CALL promjeni_radno_mjesto(1, 3);
 
 select* from zaposlenik;
 ```
+
+## Robert Vidaković
+## Pogledi
+
+**1.	Pogled – Vrati artikl koji je prodan u najvećoj količini**
+```sql
+CREATE VIEW najprodavaniji_artikl AS
+SELECT a.naziv AS artikl, SUM(sr.kolicina) AS ukupno_prodano
+FROM artikl a
+JOIN stavka_racun sr ON a.ID = sr.ID_artikl
+GROUP BY a.ID
+ORDER BY ukupno_prodano DESC
+LIMIT 1;
+```
+
+Povezujemo tablicu **artikl** i **stavka_racun**. Povezivanje se odvija prema stupcu ID, gdje je ID artikla u tablici artikl jednak ID-u artikla u tablici stavka_racun.
+
+Nakon povezivanja, podaci se grupiraju prema ID-u artikla, a zatim se sumira količina za svaki artikl koristeći funkciju **SUM**. Rezultat se sortira silazno prema ukupnoj prodaji koristeći **ORDER BY**. Na kraju koristimo **LIMIT 1** kako bi se ograničio rezultat na samo jedan redak, tj. najprodavaniji artikl. 
+
+<br>
+
+**2.	Pogled – Praćenje narudžbi i njihovog statusa**
+```sql
+CREATE VIEW pregled_narudzbi AS
+SELECT r.ID, r.datum_izdavanja, z.ime AS zaposlenik, k.ime AS kupac, iz.datum_dostavljanja, iz.vrijeme_dostavljanja
+FROM racun r
+JOIN zaposlenik z ON r.ID_zaposlenik = z.ID
+JOIN stavka_racun sr ON r.ID = sr.ID_racun
+JOIN artikl a ON sr.ID_artikl = a.ID
+JOIN izdatnica iz ON r.ID = iz.ID
+JOIN kupac k ON iz.ID = k.ID;
+```
+Pogled će kao rezultat prikazati ID računa, datum izdavanja računa, ime zaposlenika koji je izdao račun, ime kupca, datum dostavljanja, i vrijeme dostavljanja.
+
+Spajamo tablicu **zaposlenik** s tablicom **racun** tako da se ID_zaposlenik na računu podudara s ID-em zaposlenika. Zatim dodajemo podatke o stavkama računa iz tablice **stavka_racun** na temelju odgovarajućih ID-eva računa. Informacije o artiklima iz tablice artikl pridružujemo tako da se podudara sa ID-em artikla na tablici **stavka_racun**. Povezujemo tablicu izdatnica s racun po ID-u te dodajemo informacije o kupcu na tablici **izdatnica**.
+
+<br>
+
+**3.	Pogled – U svrhu dobave, treba prikazati sve artikle koji se trenutno nalaze na skladištu i čija je količina manja od prosječne količine za sve artikle na skladištu.**
+```sql
+CREATE VIEW artikli_za_dobavu AS
+SELECT a.naziv AS artikl, a.vrsta_artikla, aus.kolicina AS kolicina_na_skladistu, AVG(aus.kolicina) AS prosjecna_kolicina
+FROM artikl a
+JOIN artikli_u_skladistu aus ON a.ID = aus.ID_artikl
+GROUP BY a.ID
+HAVING aus.kolicina < AVG(aus.kolicina);
+```
+**SELECT a.naziv AS artikl, a.vrsta_artikla, aus.kolicina AS kolicina_na_skladistu, AVG(aus.kolicina) AS prosjecna_kolicina**: Ovaj dio nabraja stupce koji će biti prikazani u rezultatu pogleda. To uključuje naziv artikla (a.naziv), vrstu artikla (a.vrsta_artikla), količinu artikla na skladištu (aus.kolicina) i prosječnu količinu tog artikla u skladištu (AVG(aus.kolicina)).
+
+Pridružujemo podatke iz tablice **artikli_u_skladistu** sa tablicom **artikl** po ID-u, grupiramo prema ID-u artikla iz tablice **artikl** i uključujemo rezultate gdje je količina artikla u skladištu manja od prosječne količine artikala u skladištu.
+
+<br>
+
+**4.	Pogled - Dostupni proizvodi u određenom skladištu**
+```sql
+CREATE VIEW pregled_dostupnih_proizvoda AS
+SELECT aus.ID_skladiste, a.ID AS ID_artikl, a.naziv AS artikl, COALESCE(aus.kolicina, 0) AS dostupna_kolicina
+FROM skladiste s
+LEFT JOIN artikli_u_skladistu aus ON s.ID = aus.ID_skladiste
+LEFT JOIN artikl a ON aus.ID_artikl = a.ID;
+
+SELECT * FROM pregled_dostupnih_proizvoda WHERE ID_skladiste = 5;
+```
+Pogled koji će ispisati sve artikle koji su trenutno dostupni u skladištu.
+
+Nabrajamo stupce koji će biti uključeni u rezultat, funkcija **COALESCE** se koristi kako bi se postavila nulta vrijednost u slučaju da nema dostupne količine. Radimo LEFT JOIN tablice **artikli_u_skladistu** s tablicom **skladiste** da bi se uključila i skladišta koja nemaju podatke u tablici **artikli_u_skladistu**, te dodajemo informacije o artiklima iz tablice **artikl** tako što će povezati ID-eve artikala iz tablice **artikli_u_skladistu**.
+
+<br>
+
+**5.	Pogled – Zarada cijele godine po kvartalima**
+```sql
+CREATE VIEW zarada_po_kvartalima AS
+SELECT YEAR(r.datum_izdavanja) AS godina,
+    CASE
+        WHEN MONTH(r.datum_izdavanja) BETWEEN 1 AND 3 THEN 'Q1'
+        WHEN MONTH(r.datum_izdavanja) BETWEEN 4 AND 6 THEN 'Q2'
+        WHEN MONTH(r.datum_izdavanja) BETWEEN 7 AND 9 THEN 'Q3'
+        WHEN MONTH(r.datum_izdavanja) BETWEEN 10 AND 12 THEN 'Q4'
+    END AS kvartal,
+    SUM(sr.kolicina * a.cijena) AS prihod
+FROM racun r
+JOIN stavka_racun sr ON r.ID = sr.ID_racun
+JOIN artikl a ON sr.ID_artikl = a.ID
+GROUP BY YEAR(r.datum_izdavanja), kvartal;
+
+SELECT * FROM zarada_po_kvartalima WHERE godina = 2021;
+```
+Pomoću ovog pogleda možemo provjeriti zaradu po kvartalima.
+
+Prvo izdvajamo godinu iz datuma izdavanja računa koristeći funkciju **YEAR**. **CASE** izraz koristimo kako bi se odredio kvartal godine na temelju mjeseca izdavanja računa. Svaki kvartal je označen s Q1, Q2, Q3 ili Q4, ovisno o mjesecu izdavanja. 
+
+Kako bi izračunali ukupan prihod za svaki kvartal, moramo pomnožiti količinu koja se nalazi u **stavka_racun** sa cijenom artikla, tu koristimo **SUM(sr.kolicina * a.cijena) AS prihod** i postavljamo vrijednost kao prihod.
+
+Onda povezujemo podatke o stavkama računa iz tablice **stavka_racun** na temelju odgovarajućih ID-eva računa, te povezujemo informacije o artiklima iz tablice **artikl** na temelju ID-eva artikala iz stavki računa. Na kraju se podaci grupiraju po godini i kvartalu.
+
+<br>
+
+## Privremene tablice
+
+Privremene tablice su lokalne tablice koje se stvaraju i koriste tijekom izvođenja specifičnog upita ili sesije, a zatim se automatski brišu kada završi izvršavanje upita ili kada završi sesija korisnika. One nam pružaju privremeni prostor za pohranu podataka tijekom izvođenja upita ili skripti.
+
+```sql
+CREATE TEMPORARY TABLE temp_racun AS SELECT * FROM racun LIMIT 0;
+INSERT INTO temp_racun (ID, ID_zaposlenik, datum_izdavanja, ID_firma) VALUES
+(1, 101, '2024-01-01', 201),
+(2, 102, '2024-01-02', 202),
+(3, 103, '2024-01-03', 203),
+(4, 104, '2024-01-04', 204),
+(5, 105, '2024-01-05', 205),
+(6, 106, '2024-01-06', 206),
+(7, 107, '2024-01-07', 207),
+(8, 108, '2024-01-08', 208),
+(9, 109, '2024-01-09', 209),
+(10, 110, '2024-01-10', 210);
+```
+
+Stvaramo privremenu tablicu pod nazivom **temp_racun** tako da koristimo upit SELECT * FROM racun, specificiramo LIMIT 0 kako bi dobili praznu tablicu s istom strukturom kao i tablica **racun**. Zatim unosimo nove podatke.
+
+<br>
+
+```sql
+CREATE TEMPORARY TABLE temp_zaposlenik AS SELECT * FROM zaposlenik LIMIT 0;
+INSERT INTO temp_zaposlenik (ID, ime, prezime, OIB, datum_zaposlenja, ID_skladiste, ID_vrsta_posla) VALUES
+(101, 'Antonieta', 'Suzanić', '12345678901', '2023-01-01', 301, 401),
+(102, 'Vladimir', 'Grego', '23456789012', '2023-02-01', 302, 402),
+(103, 'Norma', 'Gašparec', '34567890123', '2023-03-01', 303, 403),
+(104, 'Cvita', 'Kostelac', '45678901234', '2023-04-01', 304, 404),
+(105, 'Boris', 'GLADINA', '56789012345', '2023-05-01', 305, 405),
+(106, 'Eva', 'Miller', '67890123456', '2023-06-01', 306, 406),
+(107, 'David', 'Horvat', '78901234567', '2023-07-01', 307, 407),
+(108, 'Stjepan', 'Kovačević', '89012345678', '2023-08-01', 308, 408),
+(109, 'Vedran', 'Rogan', '90123456789', '2023-09-01', 309, 409),
+(110, 'Zoran', 'Marković', '01234567890', '2023-10-01', 310, 410);
+```
+Kreiramo novu privremenu tablicu **temp_zaposlenik** s istom strukturom kao i tablica **zaposlenik** ali je prazna pa želimo dodati nove podatke.
+
+<br>
+
+```sql
+CREATE TEMPORARY TABLE temp_stavka_racun AS SELECT * FROM stavka_racun LIMIT 0;
+INSERT INTO temp_stavka_racun (ID, ID_racun, ID_artikl, kolicina) VALUES
+(1, 1, 501, 5),
+(2, 1, 502, 3),
+(3, 2, 503, 2),
+(4, 3, 504, 1),
+(5, 4, 505, 4),
+(6, 4, 506, 2),
+(7, 5, 507, 3),
+(8, 6, 508, 1),
+(9, 7, 509, 2),
+(10, 8, 510, 3);
+
+
+CREATE TEMPORARY TABLE temp_artikl AS SELECT * FROM artikl LIMIT 0;
+INSERT INTO temp_artikl (ID, cijena, naziv, vrsta_artikla) VALUES
+(501, 20.50, 'Artikl1', 'Elektronika'),
+(502, 15.75, 'Artikl2', 'Odjeća'),
+(503, 30.00, 'Artikl3', 'Hrana'),
+(504, 12.99, 'Artikl4', 'Knjige'),
+(505, 25.00, 'Artikl5', 'Igračke'),
+(506, 18.50, 'Artikl6', 'Sport'),
+(507, 22.75, 'Artikl7', 'Kozmetika'),
+(508, 10.99, 'Artikl8', 'Alati'),
+(509, 16.50, 'Artikl9', 'Namještaj'),
+(510, 28.75, 'Artikl10', 'Elektronika');
+
+
+CREATE TEMPORARY TABLE temp_izdatnica AS SELECT * FROM izdatnica LIMIT 0;
+INSERT INTO temp_izdatnica (ID, datum_dostavljanja, vrijeme_dostavljanja, ID_zaposlenik, ID_kupac) VALUES
+(1, '2024-01-05', '14:30:00', 101, 601),
+(2, '2024-01-06', '15:45:00', 102, 602),
+(3, '2024-01-07', '16:30:00', 103, 603),
+(4, '2024-01-08', '17:15:00', 104, 604),
+(5, '2024-01-09', '18:00:00', 105, 605),
+(6, '2024-01-10', '19:30:00', 106, 606),
+(7, '2024-01-11', '20:45:00', 107, 607),
+(8, '2024-01-12', '21:30:00', 108, 608),
+(9, '2024-01-13', '22:15:00', 109, 609),
+(10, '2024-01-14', '23:00:00', 110, 610);
+
+
+CREATE TEMPORARY TABLE temp_kupac AS SELECT * FROM kupac LIMIT 0;
+INSERT INTO temp_kupac (ID, ime, prezime, ID_adresa, telefon) VALUES
+(601, 'Kupac1', 'Prezime1', 701, '123-456-7890'),
+(602, 'Kupac2', 'Prezime2', 702, '987-654-3210'),
+(603, 'Kupac3', 'Prezime3', 703, '555-123-4567'),
+(604, 'Kupac4', 'Prezime4', 704, '111-222-3333'),
+(605, 'Kupac5', 'Prezime5', 705, '444-555-6666'),
+(606, 'Kupac6', 'Prezime6', 706, '777-888-9999'),
+(607, 'Kupac7', 'Prezime7', 707, '999-000-1111'),
+(608, 'Kupac8', 'Prezime8', 708, '222-333-4444'),
+(609, 'Kupac9', 'Prezime9', 709, '666-777-8888'),
+(610, 'Kupac10', 'Prezime10', 710, '000-111-2222');
+```
+Stvaramo sljedeće četiri privremene tablice na isti način kao i prijašnje, koristimo **CREATE TEMPORARY TABLE ime_tablice AS SELECT * FROM ime_tablice LIMIT 0;** te u tablice unosimo podatke.
+
+<br>
+
+```sql
+SELECT DISTINCT temp_racun.ID, temp_racun.datum_izdavanja, temp_zaposlenik.ime AS zaposlenik, temp_kupac.ime AS kupac, 
+	temp_izdatnica.datum_dostavljanja, temp_izdatnica.vrijeme_dostavljanja
+FROM temp_racun
+JOIN temp_zaposlenik ON temp_racun.ID_zaposlenik = temp_zaposlenik.ID
+JOIN temp_izdatnica ON temp_racun.ID = temp_izdatnica.ID
+JOIN temp_kupac ON temp_izdatnica.ID_kupac = temp_kupac.ID;
+```
+Ovaj upit služi samo kao provjera privremenih tablica te praćenje narudžbi.
+
+Koristimo **DISTINCT** tako da uključimo samo jedinstvene retke te uzimamo ID računa i datum izdavanja računa iz privremene tablice **temp_racun**. Ime zaposlenika iz privremene tablice **temp_zaposlenik**, ime kupca iz privremene tablice **temp_kupac** te datum i vrijeme dostavljanja izdatnice iz privremene tablice **temp_izdatnica**.
+
+Spajamo informacije o zaposlenicima iz privremenih tablica **temp_zaposlenik** i **temp_racun** na temelju ID-eva zaposlenika, informacije o izdatnicama iz privremene tablice **temp_izdatnica** na temelju ID-eva izdatnica te informacije o kupcima iz privremenih tablica **temp_kupac** i **temp_izdatnica** na temelju ID-eva kupaca.
+
+<br>
+
+```sql
+SELECT tr.ID, tr.datum_izdavanja, SUM(tar.cijena * tsr.kolicina) AS ukupni_iznos
+FROM temp_racun tr
+JOIN temp_stavka_racun tsr ON tr.ID = tsr.ID_racun
+JOIN temp_artikl tar ON tsr.ID_artikl = tar.ID
+GROUP BY tr.ID, tr.datum_izdavanja;
+```
+Ovim upitom računamo ukupan iznos za svaki račun koji se nalazi u privremenoj tablici.
+
+Uzimamo ID računa i datum izdavanja iz privremene tablice **temp_racun**, ukupni iznos za svaki račun, koji se računa kao zbroj umnoženih cijena artikala iz privremene tablice **temp_artikl** s količinama iz privremene tablice **temp_stavka_racun**. 
+
+Spajamo informacije o stavkama računa iz privremenih tablica **temp_stavka_racun** i **temp_racun** na temelju ID-eva računa. Zatim informacije o artiklima iz privremenih tablica **temp_artikl** i **temp_stavka_racun** na temelju ID-eva artikala te grupiramo rezultate po ID-evima računa i datumima izdavanja.
