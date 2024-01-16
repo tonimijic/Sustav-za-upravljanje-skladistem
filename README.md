@@ -1501,3 +1501,260 @@ DELIMITER ;
 CALL novi_racun(1, 5);
 ```
 
+## Atila Astaloš
+
+### Programski dio
+
+1.Funkcija odabira 
+
+```sql
+def menu():
+    print("1. Pregled relacije")
+    print("2. Dodavanje podataka u relaciju")
+    print("3. Brisanje podataka iz relacije")
+    print("4. Okidaci, funkcije i procedure")
+    print("5. Upiti")
+    
+    a = input("Unesi odgovor:")
+    
+    
+    
+Dobrodosli u aplikaciju!
+1. Pregled relacije
+2. Dodavanje podataka u relaciju
+3. Brisanje podataka iz relacije
+4. Okidaci, funkcije i procedure
+5. Upiti
+Unesi odgovor:
+```
+
+Pomoću ove funkcije odabiremo što ćemo raditi u našoj aplikaciji
+
+2.Prikaz relacija 
+
+```sql
+ pregled_relacija()
+        
+        print("\n")
+        a = input("Unesi naziv relacije koju zelis pregledat: ")
+        cursor.execute("SELECT * FROM "+a)
+        table = cursor.fetchall()
+        for data in table:
+            print(data)
+        print("\n")
+```
+
+Fukcija kojom dohvaćamo sve relacije iz baze podataka.
+
+3.Unos novih podataka u relacije
+
+```sql
+print("Unesi naziv relacije u koju zelis dodati podatak: \n")
+        cursor.execute("SHOW TABLES")
+        table = cursor.fetchall()
+        for data in table:
+            print(data)
+        print("\n")
+```
+
+Unošenje novih podataka u slučaju potrebe za proširenjem relacija.
+
+4.Brisanje podataka iz relacije 
+
+```sql
+print("Unesi naziv relacije iz koje zelis izbrisat podatak: \n")
+        cursor.execute("SHOW TABLES")
+        table = cursor.fetchall()
+        for data in table:
+            print(data)
+        print("\n")
+```
+
+Brisanje nepotrebnih ili višak argumenata.
+
+5.Funkcije
+
+```sql
+a=input("Unesi naziv funkcije koju zelis testirat:")
+            
+if a=="dostupnost_proizvoda_na_skladistu":
+                
+                cursor.execute("SELECT * FROM artikl")
+                print(cursor.fetchall())
+                print("\n")
+                cursor.execute("SELECT * FROM skladiste")
+                print(cursor.fetchall())
+                print("\n")
+                
+                a = input("Unesi id artikla:")
+                b = input("Unesi id skladista:")
+                
+                cursor.execute("SELECT dostupnost_proizvoda_na_skladistu("+a+","+b+")AS dostupna_kolicina")
+                print(cursor.fetchall())
+                
+elif a=="sveukupna_kolicina_prodanih_proizvoda":
+                cursor.execute("SELECT * FROM stavka_racun")
+                print(cursor.fetchall())
+                
+                a = input("Unesi pocetni datum u obliku YYYY-MM-DD:")
+                b = input("Unesi krajnji datum u obliku YYYY-MM-DD:")
+                
+                cursor.execute("SELECT sveukupna_kolicina_prodanih_proizvoda('"+a+"'"+",'"+b+"')")
+                print(cursor.fetchall())
+            
+elif a=="zaposlenici_u_skladistu":
+                cursor.execute("SELECT id FROM skladiste")
+                print(cursor.fetchall())
+                
+                a = input("Unesi id skladista za koje zelis dohvatit broj zaposlenih:")
+                cursor.execute("SELECT zaposlenici_u_skladistu("+a+")")
+                print(cursor.fetchall())
+```
+
+Jedna od funkcija u ovom slučaju namjenjena za pretragu dostupnosti proizvoda na skladištu. Funkcije nam služe za postizanje nekog određenog rezultata. Druga nam prikazuje ukupnu kolicinu prodanih artikala, dok nam treća ispisuje broj zaposlenika za određeno skladište.
+
+6.Okidači
+
+```sql
+print("Okidaci:")
+            for trigger in triggers:
+                print(trigger[0])
+            print("\n")
+            
+            a = input("Unesi naziv okidaca kojeg zelite testirat:")
+            
+            if a == "negativna_kolicina":
+                print("Artikli u skladistu:")
+                cursor.execute("SELECT * FROM artikli_u_skladistu")
+                print(cursor.fetchall())
+                
+                
+                a = input("Unesi id:")
+                b = input("Unesi id skladista:")
+                c = input("Unesi id artikla:")
+                d = input("Unesi kolicinu:")
+                
+                cursor.execute("INSERT INTO artikli_u_skladistu VALUE 				("+a+","+b+","+c+","+d+")")
+                connection.commit()
+                cursor.execute("SELECT * FROM artikli_u_skladistu")
+                print(cursor.fetchall())
+                
+             elif a == "prije_unosa_racuna":
+                print("Zaposlenici:")
+                cursor.execute("SELECT id FROM zaposlenik")
+                print(cursor.fetchall())
+                
+                print("\n Racun:")
+                cursor.execute("SELECT * FROM racun")
+                print(cursor.fetchall())
+                
+                a = input("Unesi id:")
+                b = input("Unesi id zaposlenika:")
+                c = input("Unesi dan izdavanja racuna:")
+                d = input("Unesi mjesec izdavanja racuna:")
+                e = input("Unesi godinu izdavanja racuna:")
+                f = input("Unesi id firme:")
+                
+                cursor.execute("INSERT INTO racun VALUES (%s, %s, STR_TO_DATE(%s, '%d.%m.%Y.'), %s)", (a, b, c + "." + d + "." + e, f))
+                connection.commit()
+                
+                print("\n Racun:")
+                cursor.execute("SELECT * FROM racun")
+                print(cursor.fetchall())
+             
+             
+```
+
+Primjer jednog okidača koji omogućava prekid unosa podataka u ovom slučaju unos negativnog artikla u skladište. Postavljeni okidač odreagira tj. izvršava se odmah nakon unosa negativnog artikla. Drugi okidač prekine unos ako ID zaposlenika ne postoji.
+
+7.Procedure
+
+```sql
+elif a == "NajcesceKoristenoSkladiste":
+                cursor.callproc("NajcesceKoristenoSkladiste")
+                output_params = cursor.stored_results()
+                for result in output_params:
+                    for row in result.fetchall():
+                        print(row)
+                        
+ elif a == "popust_ne_prodani":
+                cursor.execute("CALL popust_ne_prodani()")
+                cursor.execute("SELECT * FROM artikl")
+                print(cursor.fetchall())
+                
+elif a == "prikaz_najpunijeg_skladista":
+                cursor.callproc("prikaz_najpunijeg_skladista")
+                output_params = cursor.stored_results()
+                for result in output_params:
+                    for row in result.fetchall():
+                        print(row)
+            
+elif a == "promjeni_radno_mjesto":
+                cursor.execute("SELECT * FROM zaposlenik")
+                print(cursor.fetchall())
+                
+                a = input("Unesi id zaposlenika kojeg zelite premjestit u drugo skladiste:")
+                b = input("Unesi id skladista u koje zelite premjestit radnika:")
+                
+                cursor.execute("CALL promjeni_radno_mjesto("+a+","+b+")")
+                cursor.execute("SELECT * FROM zaposlenik WHERE id="+a)
+                print(cursor.fetchall())
+                connection.commit()
+```
+
+Pozivanjem se izvršavaju, u ovom slučaju prva pokazuje najkorištenije skladište, a druga procedura artikle koji se nisu prodali,a imaju popust. Treća procedura pomaže u slučaju da nam je potrebna informacija koje je skladište najviše napunjeno. Zadnji prikazani primjer omogućuje promjenu radnog mjesta zaposlenika u drugo skladište. 
+
+8.Upiti
+
+```sql
+elif   a == "3." or a == "3":
+	cursor.execute("""
+        SELECT a.*, au.kolicina, s.naziv AS naziv_skladista
+        FROM artikl a
+        JOIN artikli_u_skladistu au ON a.ID = au.ID_artikl
+        JOIN skladiste s ON au.ID_skladiste = s.ID
+        WHERE au.kolicina < (SELECT AVG(kolicina) FROM artikli_u_skladistu)
+        ORDER BY s.naziv, a.naziv;
+        """)
+     result = cursor.fetchall()
+        for row in result:
+            print(row)
+            
+elif   a == "5." or a == "5":
+        cursor.execute("""
+            SELECT firma.naziv AS naziv_firme,
+                COUNT(DISTINCT skladiste.ID) AS broj_skladista
+            FROM firma
+            JOIN skladiste ON firma.ID = skladiste.ID_firma
+            GROUP BY firma.ID
+            HAVING broj_skladista > 1;
+            """)
+            
+elif   a == "7." or a == "7":
+        cursor.execute("""
+            SELECT i.*, povratno.razlog_povratka
+            FROM izdatnica i
+            JOIN zaposlenik z ON i.ID_zaposlenik = z.ID
+            JOIN povratno ON i.ID = povratno.id_izdatnica;
+        """)
+        
+elif   a == "10." or a == "10":
+        cursor.execute("""
+        SELECT SUM(cijena * kolicina) AS ukupna_vrijednost
+        FROM stavka_racun
+        JOIN artikl ON stavka_racun.ID_artikl = artikl.ID;
+        """)
+        result = cursor.fetchall()
+        for row in result:
+            print("Ukupna vrijednost artikala:", row[0])
+            
+         
+```
+
+Primjer upita napisanih u python programskom jeziku. 
+
+
+
+
+
+
