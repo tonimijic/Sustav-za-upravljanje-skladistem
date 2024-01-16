@@ -1,0 +1,873 @@
+import mysql.connector
+
+connection = mysql.connector.connect(
+    user='root',
+    password='root',
+    host='localhost',
+    database='skladiste'
+)
+
+cursor = connection.cursor()
+print("Dobrodosli u aplikaciju!")
+
+def pregled_relacija():
+    cursor.execute("SHOW TABLES")
+    tables = cursor.fetchall()
+    print("\n")
+    print("Relacije:")
+    for table in tables:
+            print(table[0])
+
+def menu_upiti():
+    print("1. Prosjecna starost zaposlenika, broj zaposlenika u svakoj firmi, te ukupan broj izdanih racuna po firmama")
+    print("2. Dohvati drzavu s najvisom ukupnom vrijednoscu izdanih racuna")
+    print("3. Dohvati artikle cija je koliÄŤina manja od prosjeÄŤne kolicine po skladistu")
+    print("4. Pronadi dobavljaca s najduzim radnim stazem te najvise povratnih informacija")
+    print("5. Prikazi sve firme koje imaju viĹˇe od jednog skladista, zajedno s brojem skladista koje posjeduju")
+    print("6. Prikazi sve dostave koje je obavio odredeni dostavljac")
+    print("7. Pronadi sve pakete koji su dostavljeni s razlogom povratka")
+    print("8. Vrsta posla i ukupan broj zaposlenika koji obavljaju tu vrstu posla")
+    print("9. Informacije o zaposlenicima koji su bili ukljuceni u izdavanje robe za firmu koja je imala povratnu informaciju o nekoj robi")
+    print("10. Izracunaj ukupnu vrijednost artikala")
+    print("11. Prikazi sve dostavljace i broj dostava koje su obavili")
+    print("12. Dohvati informacije o stavkama izdatnica, ukljucujuci naziv artikla, koliÄŤinu, datum i vrijeme dostavljanja, ime i prezime zaposlenika. Podaci su sortirani prema datumu i vremenu dostavljanja u silaznom redoslijedu")
+    print("13. Prikazi sve razloge povratka koji se odnose na odreÄ‘enog dostavljaca")
+    print("14. Izlistaj sve adrese koje imaju viĹˇe od jednog skladista")
+    print("15. Prikazi informacije o zaposlenicima, njihovim skladistima, gradovima i vrsti posla")
+
+
+
+    
+    a = input("Unesite vas odbair:")
+    
+    if a == "1." or a == "1":
+        cursor.execute("""
+            SELECT firma.naziv AS 'Firma', COUNT(DISTINCT zaposlenik.ID) AS 'Broj_zaposlenika', 
+                AVG(DATEDIFF('2024-01-03', zaposlenik.datum_zaposlenja)/365) AS 'Prosjecna_staz', 
+                SUM(racun.ID IS NOT NULL) AS 'Broj_izdanih_racuna'
+            FROM firma
+            JOIN skladiste ON firma.ID = skladiste.ID_firma
+            JOIN zaposlenik ON skladiste.ID = zaposlenik.ID_skladiste
+            LEFT JOIN racun ON zaposlenik.ID = racun.ID_zaposlenik
+            WHERE YEAR(zaposlenik.datum_zaposlenja) <= 2022
+            GROUP BY firma.naziv
+            ORDER BY Broj_izdanih_racuna DESC, Broj_zaposlenika DESC;
+        """)
+        result = cursor.fetchall()
+        for row in result:
+            print(row)
+            
+    elif   a == "2." or a == "2":
+        cursor.execute("""
+        SELECT drzava.naziv AS drzava, 
+            SUM(artikl.cijena * stavka_racun.kolicina) AS ukupna_vrijednost_racuna
+        FROM drzava
+        JOIN adresa ON drzava.ID = adresa.id_drzava
+        JOIN firma ON adresa.ID = firma.ID_adresa
+        JOIN skladiste ON firma.ID = skladiste.ID_firma
+        JOIN zaposlenik ON skladiste.ID = zaposlenik.ID_skladiste
+        JOIN racun ON zaposlenik.ID = racun.ID_zaposlenik
+        JOIN stavka_racun ON racun.ID = stavka_racun.ID_racun
+        JOIN artikl ON stavka_racun.ID_artikl = artikl.ID
+        GROUP BY drzava.naziv
+        ORDER BY ukupna_vrijednost_racuna DESC
+        LIMIT 1;
+        """)
+        result = cursor.fetchall()
+        for row in result:
+            print(row) 
+
+    elif   a == "3." or a == "3":
+        cursor.execute("""
+        SELECT a.*, au.kolicina, s.naziv AS naziv_skladista
+        FROM artikl a
+        JOIN artikli_u_skladistu au ON a.ID = au.ID_artikl
+        JOIN skladiste s ON au.ID_skladiste = s.ID
+        WHERE au.kolicina < (SELECT AVG(kolicina) FROM artikli_u_skladistu)
+        ORDER BY s.naziv, a.naziv;
+        """)
+        result = cursor.fetchall()
+        for row in result:
+            print(row)
+        
+    elif   a == "4." or a == "4":
+        cursor.execute("""
+        SELECT 
+        dobavljac.ID AS id_dobavljac,
+        zaposlenik.ime AS ime_zaposlenika,
+        zaposlenik.prezime AS prezime_zaposlenika,
+        dobavljac.godine_iskustva AS godine_iskustva,
+        COUNT(DISTINCT povratno.id_izdatnica) AS broj_povratnih_informacija
+        FROM
+        dobavljac
+            JOIN
+        zaposlenik ON dobavljac.ID_zaposlenik = zaposlenik.ID
+            JOIN
+        izdatnica ON zaposlenik.ID = izdatnica.ID_zaposlenik
+            LEFT JOIN
+        povratno ON izdatnica.ID = povratno.id_izdatnica
+        GROUP BY dobavljac.ID
+        ORDER BY godine_iskustva DESC , broj_povratnih_informacija DESC
+        LIMIT 1;
+        """)
+        result = cursor.fetchall()
+        for row in result:
+            print(row)
+    
+    elif   a == "5." or a == "5":
+        cursor.execute("""
+            SELECT firma.naziv AS naziv_firme,
+                COUNT(DISTINCT skladiste.ID) AS broj_skladista
+            FROM firma
+            JOIN skladiste ON firma.ID = skladiste.ID_firma
+            GROUP BY firma.ID
+            HAVING broj_skladista > 1;
+            """)
+        result = cursor.fetchall()
+        for row in result:
+            print(row)
+    
+    elif   a == "6." or a == "6":
+        cursor.execute("""
+            SELECT
+                i.ID AS Dostava_ID,
+                i.datum_dostavljanja AS Datum_Dostave,
+                i.vrijeme_dostavljanja AS Vrijeme_Dostave,
+                z.ime AS Dostavljac_Ime,
+                z.prezime AS Dostavljac_Prezime,
+                k.ime AS Kupac_Ime,
+                k.prezime AS Kupac_Prezime,
+                a.grad AS Adresa_Grad,
+                a.postanski_broj AS Adresa_Postanski_Broj,
+                p.razlog_povratka AS Razlog_Povratka
+            FROM
+                izdatnica i
+            JOIN
+                zaposlenik z ON i.ID_zaposlenik = z.ID
+            JOIN
+                stavka_izdatnica si ON i.ID = si.ID_izdatnica
+            JOIN
+                kupac k ON i.ID_kupac = k.ID
+            JOIN
+                adresa a ON k.ID_adresa = a.ID
+            LEFT JOIN
+                povratno p ON i.ID = p.id_izdatnica
+            WHERE
+                i.ID_zaposlenik = 11;
+        """)
+        result = cursor.fetchall()
+        for row in result:
+            print("Dostava ID:", row[0])
+            print("Datum Dostave:", row[1])
+            print("Vrijeme Dostave:", row[2])
+            print("Dostavljac Ime:", row[3])
+            print("Dostavljac Prezime:", row[4])
+            print("Kupac Ime:", row[5])
+            print("Kupac Prezime:", row[6])
+            print("Adresa Grad:", row[7])
+            print("Adresa Postanski Broj:", row[8])
+            print("Razlog Povratka:", row[9])
+            print("\n")
+
+    elif   a == "7." or a == "7":
+        cursor.execute("""
+            SELECT i.*, povratno.razlog_povratka
+            FROM izdatnica i
+            JOIN zaposlenik z ON i.ID_zaposlenik = z.ID
+            JOIN povratno ON i.ID = povratno.id_izdatnica;
+        """)
+        result = cursor.fetchall()
+        for row in result:
+            print("Izdatnica ID:", row[0])
+            print("Datum Dostavljanja:", row[1])
+            print("Vrijeme Dostavljanja:", row[2])
+            print("ID Zaposlenika:", row[3])
+            print("ID Kupca:", row[4])
+            print("Razlog Povratka:", row[5])
+            print("\n")
+
+    elif   a == "8." or a == "8":
+        cursor.execute("""
+        SELECT vrsta_posla.naziv AS vrsta_posla,
+            COUNT(zaposlenik.ID) AS ukupan_broj_zaposlenika
+        FROM vrsta_posla
+        LEFT JOIN zaposlenik ON vrsta_posla.ID = zaposlenik.ID_vrsta_posla
+        GROUP BY vrsta_posla.ID;
+        """)
+        result = cursor.fetchall()
+        for row in result:
+            print(row)
+
+    elif   a == "9." or a == "9":
+        cursor.execute("""
+        SELECT 
+        zaposlenik.ime, 
+        zaposlenik.prezime, 
+        firma.naziv AS naziv_firme, 
+        izdatnica.datum_dostavljanja, 
+        povratno.razlog_povratka
+        FROM 
+        zaposlenik
+        JOIN 
+        izdatnica ON zaposlenik.ID = izdatnica.ID_zaposlenik
+        JOIN 
+        povratno ON izdatnica.ID = povratno.id_izdatnica
+        JOIN 
+        firma ON zaposlenik.ID_skladiste = firma.ID
+        JOIN 
+        adresa ON firma.ID_adresa = adresa.ID
+        WHERE 
+        povratno.razlog_povratka IS NOT NULL
+        AND izdatnica.datum_dostavljanja BETWEEN '2023-01-01' AND '2023-12-31'
+        LIMIT 1;
+        """)
+        result = cursor.fetchall()
+        for row in result:
+            print(row)
+
+    elif   a == "10." or a == "10":
+        cursor.execute("""
+        SELECT SUM(cijena * kolicina) AS ukupna_vrijednost
+        FROM stavka_racun
+        JOIN artikl ON stavka_racun.ID_artikl = artikl.ID;
+        """)
+        result = cursor.fetchall()
+        for row in result:
+            print("Ukupna vrijednost artikala:", row[0])
+
+
+    elif   a == "11." or a == "11":
+        cursor.execute("""
+        SELECT
+            z.ID AS dostavljac_id,
+            z.ime AS ime_dostavljaca,
+            z.prezime AS prezime_dostavljaca,
+            COUNT(i.ID) AS broj_dostava
+        FROM zaposlenik z
+        JOIN izdatnica i ON z.ID = i.ID_zaposlenik
+        GROUP BY dostavljac_id;
+        """)
+        result = cursor.fetchall()
+        for row in result:
+            print("DostavljaÄŤ ID:", row[0])
+            print("Ime DostavljaÄŤa:", row[1])
+            print("Prezime DostavljaÄŤa:", row[2])
+            print("Broj Dostava:", row[3])
+            print("\n")
+
+
+    elif   a == "12." or a == "12":
+        cursor.execute("""
+            SELECT si.ID AS 'ID_Stavke', a.naziv AS 'Naziv_Artikla', si.kolicina AS 'KoliÄŤina',
+                iz.datum_dostavljanja AS 'Datum_Dostavljanja', iz.vrijeme_dostavljanja AS 'Vrijeme_Dostavljanja',
+                z.ime AS 'Ime_Zaposlenika', z.prezime AS 'Prezime_Zaposlenika'
+            FROM stavka_izdatnica si
+            JOIN artikli_u_skladistu aus ON si.ID_artikli_u_skladistu = aus.ID
+            JOIN izdatnica iz ON si.ID_izdatnica = iz.ID
+            JOIN artikl a ON aus.ID_artikl = a.ID
+            JOIN zaposlenik z ON iz.ID_zaposlenik = z.ID
+            ORDER BY iz.datum_dostavljanja DESC, iz.vrijeme_dostavljanja DESC;
+        """)
+        result = cursor.fetchall()
+        for row in result:
+            print("ID Stavke:", row[0])
+            print("Naziv Artikla:", row[1])
+            print("KoliÄŤina:", row[2])
+            print("Datum Dostavljanja:", row[3])
+            print("Vrijeme Dostavljanja:", row[4])
+            print("Ime Zaposlenika:", row[5])
+            print("Prezime Zaposlenika:", row[6])
+            print("\n")
+
+    elif   a == "13." or a == "13":
+        cursor.execute("""
+            SELECT
+                p.ID AS povrat_id,
+                i.ID_zaposlenik AS dostavljac_id,
+                z.ime AS ime_dostavljaca,
+                z.prezime AS prezime_dostavljaca,
+                p.razlog_povratka,
+                p.datum_ponovnog_dostavljanja
+            FROM povratno p
+            JOIN izdatnica i ON p.id_izdatnica = i.ID
+            JOIN zaposlenik z ON i.ID_zaposlenik = z.ID;
+        """)
+        result = cursor.fetchall()
+        for row in result:
+            print("ID povrata:", row[0])
+            print("ID dostavljaÄŤa:", row[1])
+            print("Ime dostavljaÄŤa:", row[2])
+            print("Prezime dostavljaÄŤa:", row[3])
+            print("Razlog povratka:", row[4])
+            print("Datum ponovnog dostavljanja:", row[5])
+            print("\n")
+
+
+    elif   a == "14." or a == "14":
+        cursor.execute("""
+            SELECT a.*, COUNT(s.ID) AS Broj_skladiĹˇta
+            FROM adresa a
+            JOIN skladiste s ON a.ID = s.ID_adresa
+            GROUP BY a.ID
+            HAVING Broj_skladiĹˇta > 1;
+        """)
+        result = cursor.fetchall()
+        for row in result:
+            print("ID Adrese:", row[0])
+            print("Naziv Adrese:", row[1])
+            print("ID DrĹľave:", row[2])
+            print("Grad:", row[3])
+            print("PoĹˇtanski Broj:", row[4])
+            print("Broj SkladiĹˇta:", row[5])
+            print("\n")
+
+    elif   a == "15." or a == "15":
+                cursor.execute("""
+                    SELECT
+                        z.ID AS Zaposlenik_ID,
+                        z.ime AS Zaposlenik_Ime,
+                        z.prezime AS Zaposlenik_Prezime,
+                        z.OIB AS Zaposlenik_OIB,
+                        z.datum_zaposlenja AS Zaposlenik_Datum_Zaposlenja,
+                        s.naziv AS Skladiste_Naziv,
+                        a.grad AS Grad,
+                        a.postanski_broj AS Postanski_Broj,
+                        vp.naziv AS Vrsta_Posla
+                    FROM zaposlenik z
+                    JOIN skladiste s ON z.ID_skladiste = s.ID
+                    JOIN adresa a ON s.ID_adresa = a.ID
+                    JOIN vrsta_posla vp ON z.ID_vrsta_posla = vp.ID
+                    ORDER BY Zaposlenik_ID;
+                """)
+                result = cursor.fetchall()
+                for row in result:
+                    print("Zaposlenik ID:", row[0])
+                    print("Ime Zaposlenika:", row[1])
+                    print("Prezime Zaposlenika:", row[2])
+                    print("OIB Zaposlenika:", row[3])
+                    print("Datum Zaposlenja:", row[4])
+                    print("SkladiĹˇte Naziv:", row[5])
+                    print("Grad:", row[6])
+                    print("PoĹˇtanski Broj:", row[7])
+                    print("Vrsta Posla:", row[8])
+                    print("\n")
+
+    
+
+
+    
+def menu():
+    print("1. Pregled relacije")
+    print("2. Dodavanje podataka u relaciju")
+    print("3. Brisanje podataka iz relacije")
+    print("4. Okidaci, funkcije i procedure")
+    print("5. Upiti")
+    
+    a = input("Unesi odgovor:")
+    
+    if a == "1" or a == "1.":
+        pregled_relacija()
+        
+        print("\n")
+        a = input("Unesi naziv relacije koju zelis pregledat: ")
+        cursor.execute("SELECT * FROM "+a)
+        table = cursor.fetchall()
+        for data in table:
+            print(data)
+        print("\n")
+    
+    elif a == "2" or a == "2.":
+        print("Unesi naziv relacije u koju zelis dodati podatak: \n")
+        cursor.execute("SHOW TABLES")
+        table = cursor.fetchall()
+        for data in table:
+            print(data)
+        print("\n")
+        
+        a = input("Naziv relacije:")
+        if a == "drzava" or a == "Drzava":
+            a1 = input("Unesi id:")
+            b = input("Skracenica:")
+            c = input("Naziv:")
+            d = input("Glavni grad:")
+            
+            cursor.execute("INSERT INTO " + a + " VALUES (%s, %s, %s, %s)", (a1, b, c, d))
+            connection.commit()
+            
+            cursor.execute("SELECT * FROM "+a)
+            table = cursor.fetchall()
+            print(table)
+            print("\n")
+            
+        elif a == "adresa" or a == "Adresa":
+            a1 = int(input("Unesi id: "))
+            b = input("Naziv: ")
+            c = int(input("ID drzava: "))
+            d = input("Grad: ")
+            e = input("Postanski broj: ")
+            
+            cursor.execute("INSERT INTO adresa VALUES (%s, %s, %s, %s, %s)", (a1, b, c, d, e))
+            connection.commit()
+            
+            cursor.execute("SELECT * FROM adresa")
+            table = cursor.fetchall()
+            print(table)
+            print("\n")
+        
+        elif a == "vrsta_posla" or a == "VrstaPosla":
+            a1 = int(input("Unesi id: "))
+            b = input("Naziv: ")
+            c = input("Duznost: ")
+            d = input("Radno vrijeme: ")
+            e = input("Opis: ")
+            
+            cursor.execute("INSERT INTO vrsta_posla VALUES (%s, %s, %s, %s, %s)", (a1, b, c, d, e))
+            connection.commit()
+            
+            cursor.execute("SELECT * FROM vrsta_posla")
+            table = cursor.fetchall()
+            print(table)
+            print("\n")
+            
+        elif a == "firma" or a == "Firma":
+            a1 = int(input("Unesi id: "))
+            b = input("Naziv: ")
+            c = input("OIB: ")
+            d = int(input("ID adresa: "))
+            
+            cursor.execute("INSERT INTO firma VALUES (%s, %s, %s, %s)", (a1, b, c, d))
+            connection.commit()
+            
+            cursor.execute("SELECT * FROM firma")
+            table = cursor.fetchall()
+            print(table)
+            print("\n")
+        
+        if a == "skladiste" or a == "Skladiste":
+            a1 = int(input("Unesi id: "))
+            b = int(input("ID firma: "))
+            c = input("Naziv: ")
+            d = int(input("ID adresa: "))
+            
+            cursor.execute("INSERT INTO skladiste VALUES (%s, %s, %s, %s)", (a1, b, c, d))
+            connection.commit()
+            
+            cursor.execute("SELECT * FROM skladiste")
+            table = cursor.fetchall()
+            print(table)
+            print("\n")
+
+        elif a == "zaposlenik" or a == "Zaposlenik":
+            a1 = int(input("Unesi id: "))
+            b = input("Ime: ")
+            c = input("Prezime: ")
+            d = input("OIB: ")
+            e = input("Datum zaposlenja (YYYY-MM-DD): ")
+            f = int(input("ID skladiĹˇte: "))
+            g = int(input("ID vrsta posla: "))
+            
+            cursor.execute("INSERT INTO zaposlenik VALUES (%s, %s, %s, %s, %s, %s, %s)", (a1, b, c, d, e, f, g))
+            connection.commit()
+            
+            cursor.execute("SELECT * FROM zaposlenik")
+            table = cursor.fetchall()
+            print(table)
+            print("\n")
+        
+        elif a == "racun" or a == "Racun":
+            a1 = int(input("Unesi id: "))
+            b = int(input("ID zaposlenik: "))
+            c = input("Datum izdavanja (YYYY-MM-DD): ")
+            d = int(input("ID firma: "))
+            
+            cursor.execute("INSERT INTO racun VALUES (%s, %s, %s, %s)", (a1, b, c, d))
+            connection.commit()
+            
+            cursor.execute("SELECT * FROM racun")
+            table = cursor.fetchall()
+            print(table)
+            print("\n")
+        
+        elif a == "artikl" or a == "Artikl":
+            a1 = int(input("Unesi id: "))
+            b = float(input("Cijena: "))
+            c = input("Naziv: ")
+            d = input("Vrsta artikla: ")
+            
+            cursor.execute("INSERT INTO artikl VALUES (%s, %s, %s, %s)", (a1, b, c, d))
+            connection.commit()
+            
+            cursor.execute("SELECT * FROM artikl")
+            table = cursor.fetchall()
+            print(table)
+            print("\n")
+        
+        elif a == "stavka_racun" or a == "Stavka_racun":
+            a1 = int(input("Unesi id: "))
+            b = int(input("ID racun: "))
+            c = int(input("ID artikl: "))
+            d = int(input("KoliÄŤina: "))
+            
+            cursor.execute("INSERT INTO stavka_racun VALUES (%s, %s, %s, %s)", (a1, b, c, d))
+            connection.commit()
+            
+            cursor.execute("SELECT * FROM stavka_racun")
+            table = cursor.fetchall()
+            print(table)
+            print("\n")
+        
+        elif a == "artikli_u_skladistu" or a == "Artikli_u_skladistu":
+            a1 = int(input("Unesi id: "))
+            b = int(input("ID skladiste: "))
+            c = int(input("ID artikl: "))
+            d = int(input("KoliÄŤina: "))
+            
+            cursor.execute("INSERT INTO artikli_u_skladistu VALUES (%s, %s, %s, %s)", (a1, b, c, d))
+            connection.commit()
+            
+            cursor.execute("SELECT * FROM artikli_u_skladistu")
+            table = cursor.fetchall()
+            print(table)
+            print("\n")
+            
+        elif a == "kupac" or a == "Kupac":
+            a1 = int(input("Unesi id: "))
+            b = input("Ime: ")
+            c = input("Prezime: ")
+            d = int(input("ID adresa: "))
+            e = input("Telefon: ")
+            
+            cursor.execute("INSERT INTO kupac VALUES (%s, %s, %s, %s, %s)", (a1, b, c, d, e))
+            connection.commit()
+            
+            cursor.execute("SELECT * FROM kupac")
+            table = cursor.fetchall()
+            print(table)
+            print("\n")
+        
+        elif a == "izdatnica" or a == "Izdatnica":
+            a1 = int(input("Unesi id: "))
+            b = input("Datum dostavljanja (YYYY-MM-DD): ")
+            c = input("Vrijeme dostavljanja (HH:MM:SS): ")
+            d = int(input("ID zaposlenik: "))
+            e = int(input("ID kupac: "))
+            
+            cursor.execute("INSERT INTO izdatnica VALUES (%s, %s, %s, %s, %s)", (a1, b, c, d, e))
+            connection.commit()
+            
+            cursor.execute("SELECT * FROM izdatnica")
+            table = cursor.fetchall()
+            print(table)
+            print("\n")
+        
+        elif a == "stavka_izdatnica" or a == "StavkaIzdatnica":
+            a1 = int(input("Unesi id: "))
+            b = int(input("ID izdatnica: "))
+            c = int(input("ID artikli_u_skladistu: "))
+            d = int(input("KoliÄŤina: "))
+            
+            cursor.execute("INSERT INTO stavka_izdatnica VALUES (%s, %s, %s, %s)", (a1, b, c, d))
+            connection.commit()
+            
+            cursor.execute("SELECT * FROM stavka_izdatnica")
+            table = cursor.fetchall()
+            print(table)
+            print("\n")
+        
+        elif a == "dobavljac" or a == "Dobavljac":
+            a1 = int(input("Unesi id: "))
+            b = int(input("ID zaposlenik: "))
+            c = input("Vozacka dozvola: ")
+            d = int(input("Godine iskustva: "))
+            
+            cursor.execute("INSERT INTO dobavljac VALUES (%s, %s, %s, %s)", (a1, b, c, d))
+            connection.commit()
+            
+            cursor.execute("SELECT * FROM dobavljac")
+            table = cursor.fetchall()
+            print(table)
+            print("\n")
+            
+        elif a == "povratno" or a == "Povratno":
+            a1 = int(input("Unesi id: "))
+            b = int(input("ID dobavljac: "))
+            c = int(input("ID izdatnica: "))
+            d = input("Razlog povratka: ")
+            e = input("Datum ponovnog dostavljanja (YYYY-MM-DD): ")
+            
+            cursor.execute("INSERT INTO povratno VALUES (%s, %s, %s, %s, %s)", (a1, b, c, d, e))
+            connection.commit()
+            
+            cursor.execute("SELECT * FROM povratno")
+            table = cursor.fetchall()
+            print(table)
+            print("\n")
+        
+    elif a == "3" or a == "3.":
+        print("Unesi naziv relacije iz koje zelis izbrisat podatak: \n")
+        cursor.execute("SHOW TABLES")
+        table = cursor.fetchall()
+        for data in table:
+            print(data)
+        print("\n")
+        
+        a = input("Naziv relacije:")
+        cursor.execute("SELECT * FROM "+a)
+        table = cursor.fetchall()
+        print(table)
+        
+        b = input("Unesi id entiteta kojeg zelis izbrisat:")
+        
+        cursor.execute("DELETE FROM "+a+" WHERE "+" id="+b)
+        connection.commit()
+        
+        cursor.execute("SELECT * FROM "+a)
+        table = cursor.fetchall()
+        print(table)
+    
+    
+    elif a == "4" or a == "4.":
+        print("Odaberite:")
+        print("1. Funkcije")
+        print("2. Okidaci")
+        print("3. Procedure\n")
+        
+        a = input("Unesi izbor:")
+        
+        
+        if a == "1" or a == "1." or a == "Funkcije" or a == "funkcije":
+            query = """
+            SELECT ROUTINE_NAME
+            FROM INFORMATION_SCHEMA.ROUTINES
+            WHERE ROUTINE_TYPE = 'FUNCTION' AND ROUTINE_SCHEMA = 'skladiste'
+            """
+            cursor.execute(query)
+            functions = cursor.fetchall()
+            print("Funkcije:")
+            for function in functions:
+                print(function[0])
+            print("\n")        
+            
+            a=input("Unesi naziv funkcije koju zelis testirat:")
+            
+            if a=="dostupnost_proizvoda_na_skladistu":
+                
+                cursor.execute("SELECT * FROM artikl")
+                print(cursor.fetchall())
+                print("\n")
+                cursor.execute("SELECT * FROM skladiste")
+                print(cursor.fetchall())
+                print("\n")
+                
+                a = input("Unesi id artikla:")
+                b = input("Unesi id skladista:")
+                
+                cursor.execute("SELECT dostupnost_proizvoda_na_skladistu("+a+","+b+")AS dostupna_kolicina")
+                print(cursor.fetchall())
+            
+            elif a=="sveukupan_iznos_raÄŤuna":
+                cursor.execute("SELECT id FROM racun")
+                print(cursor.fetchall())
+                
+                a = input("Unesi id racuna za koji zelis vidjet iznos racuna:")
+                
+                cursor.execute("SELECT sveukupan_iznos_racuna("+a+")")
+                print(cursor.fetchall())
+            
+            elif a=="sveukupna_kolicina_prodanih_proizvoda":
+                cursor.execute("SELECT * FROM stavka_racun")
+                print(cursor.fetchall())
+                
+                a = input("Unesi pocetni datum u obliku YYYY-MM-DD:")
+                b = input("Unesi krajnji datum u obliku YYYY-MM-DD:")
+                
+                cursor.execute("SELECT sveukupna_kolicina_prodanih_proizvoda('"+a+"'"+",'"+b+"')")
+                print(cursor.fetchall())
+            
+            elif a=="zaposlenici_u_skladistu":
+                cursor.execute("SELECT id FROM skladiste")
+                print(cursor.fetchall())
+                
+                a = input("Unesi id skladista za koje zelis dohvatit broj zaposlenih:")
+                cursor.execute("SELECT zaposlenici_u_skladistu("+a+")")
+                print(cursor.fetchall())
+            
+            elif a=="zaposlenik_s_najvise_radnog_staza":
+                cursor.execute("SELECT id FROM skladiste")
+                print(cursor.fetchall())
+                
+                a = input("Unesi id skladista za dohvat radnika s najvise radnog staza u tom skladistu:")
+                cursor.execute("SELECT zaposlenik_s_najvise_radnog_staza("+a+")")
+                print(cursor.fetchall())
+            
+        elif a == "2." or a == "2" or a == "okidaci" or a == "Okidaci":
+            cursor.execute("SHOW TRIGGERS")
+            triggers = cursor.fetchall()
+            
+            print("Okidaci:")
+            for trigger in triggers:
+                print(trigger[0])
+            print("\n")
+            
+            a = input("Unesi naziv okidaca kojeg zelite testirat:")
+            
+            if a == "negativna_kolicina":
+                print("Artikli u skladistu:")
+                cursor.execute("SELECT * FROM artikli_u_skladistu")
+                print(cursor.fetchall())
+                
+                
+                a = input("Unesi id:")
+                b = input("Unesi id skladista:")
+                c = input("Unesi id artikla:")
+                d = input("Unesi kolicinu:")
+                
+                cursor.execute("INSERT INTO artikli_u_skladistu VALUE ("+a+","+b+","+c+","+d+")")
+                connection.commit()
+                cursor.execute("SELECT * FROM artikli_u_skladistu")
+                print(cursor.fetchall())
+            
+            elif a == "prije_unosa_racuna":
+                print("Zaposlenici:")
+                cursor.execute("SELECT id FROM zaposlenik")
+                print(cursor.fetchall())
+                
+                print("\n Racun:")
+                cursor.execute("SELECT * FROM racun")
+                print(cursor.fetchall())
+                
+                a = input("Unesi id:")
+                b = input("Unesi id zaposlenika:")
+                c = input("Unesi dan izdavanja racuna:")
+                d = input("Unesi mjesec izdavanja racuna:")
+                e = input("Unesi godinu izdavanja racuna:")
+                f = input("Unesi id firme:")
+                
+                cursor.execute("INSERT INTO racun VALUES (%s, %s, STR_TO_DATE(%s, '%d.%m.%Y.'), %s)", (a, b, c + "." + d + "." + e, f))
+                connection.commit()
+                
+                print("\n Racun:")
+                cursor.execute("SELECT * FROM racun")
+                print(cursor.fetchall())
+                
+            elif a == "dv_racun":
+                cursor.execute("SELECT * FROM racun")
+                print(cursor.fetchall())
+                
+                a = input("Unesi id:")
+                b = input("Unesi id zaposlenika:")
+                c = input("Unesi id firme")
+                
+                cursor.execute("INSERT INTO racun VALUES ("+a+","+b+","+"CURRENT_DATE,"+c+")")
+                connection.commit()
+                
+                cursor.execute("SELECT * FROM racun")
+                print(cursor.fetchall())
+                
+        elif a == "3" or a == "3." or a == "procedure" or a == "Procedure":
+            query = "SELECT ROUTINE_NAME FROM INFORMATION_SCHEMA.ROUTINES WHERE ROUTINE_TYPE = 'PROCEDURE' AND ROUTINE_SCHEMA = 'skladiste'"
+            cursor.execute(query)
+            
+            procedures = cursor.fetchall()
+            for procedure in procedures:
+                print(procedure[0])
+            print("\n")
+            
+            a = input("Unesi naziv procedure koju zelite testirati:")
+            
+            if a == "dodaj_nagradu_zaposleniku":
+                a = input("Unesi id:")
+                cursor.execute("SET @zaposlenik_id = 0")
+                cursor.execute("CALL dodaj_nagradu_zaposleniku(@zaposlenik_id)")
+                cursor.execute("SELECT @zaposlenik_id")
+                print(cursor.fetchall())
+                connection.commit()
+            
+            elif a == "NajcesceKoristenoSkladiste":
+                cursor.callproc("NajcesceKoristenoSkladiste")
+                output_params = cursor.stored_results()
+                for result in output_params:
+                    for row in result.fetchall():
+                        print(row)
+            
+            elif a == "najvaznija_firma":
+                cursor.execute("CALL najvaznija_firma(@rezultat)")
+                cursor.execute("SELECT @rezultat")
+                print(cursor.fetchall())
+                
+            elif a == "popust_ne_prodani":
+                cursor.execute("CALL popust_ne_prodani()")
+                cursor.execute("SELECT * FROM artikl")
+                print(cursor.fetchall())
+                
+            elif a == "prijenos_artikala":
+                print("Artikli:")
+                cursor.execute("SELECT * FROM artikl")
+                print(cursor.fetchall())
+                print("Idovi skladista:")
+                cursor.execute("SELECT id FROM skladiste")
+                print(cursor.fetchall())
+                
+                a = input("Unesi id artikla kojeg zelite prmjestit:")
+                b = input("Unesi id skladista u koje zelite premjestiti artikal:")
+                cursor.execute("CALL prijenos_artikala("+a+","+b+")")
+                cursor.execute("SELECT * FROM artikli_u_skladistu WHERE id_skladiste ="+b)
+                print(cursor.fetchall())
+                connection.commit()
+            
+            elif a == "prikaz_najpunijeg_skladista":
+                cursor.callproc("prikaz_najpunijeg_skladista")
+                output_params = cursor.stored_results()
+                for result in output_params:
+                    for row in result.fetchall():
+                        print(row)
+            
+            elif a == "promjeni_radno_mjesto":
+                cursor.execute("SELECT * FROM zaposlenik")
+                print(cursor.fetchall())
+                
+                a = input("Unesi id zaposlenika kojeg zelite premjestit u drugo skladiste:")
+                b = input("Unesi id skladista u koje zelite premjestit radnika:")
+                
+                cursor.execute("CALL promjeni_radno_mjesto("+a+","+b+")")
+                cursor.execute("SELECT * FROM zaposlenik WHERE id="+a)
+                print(cursor.fetchall())
+                connection.commit()
+            
+            elif a == "Provjera_artikala_u_skladistu":
+                cursor.execute("SELECT * FROM artikli_u_skladistu")
+                print(cursor.fetchall())
+                a = input("Unesi id artikla kojeg zelite provjerit:")
+                b = input("Unesi id skladista:")
+                
+                cursor.execute("CALL Provjera_artikala_u_skladistu("+a+","+b+",@naziv_artikala ,@artiklPostoji, @broj_artikala)")
+                cursor.execute("SELECT @naziv_artikala AS NazivArtikla ,@artiklPostoji AS ArtiklPostoji,  @broj_artikala AS Kolicina")
+                print(cursor.fetchall())
+                
+            elif a == "provjeri_radnike":
+                a = input("Unesi id skladista u kojem zelite provjeriti radnike:")
+                cursor.execute("CALL provjeri_radnike("+a+")")
+                output_params = cursor.stored_results()
+                for result in output_params:
+                    for row in result.fetchall():
+                        print(row)
+            
+            elif a == "spoji_artikle":
+                id_skladista = input("Unesite id skladista u kojem zelite spojiti artikle: ")
+                cursor.callproc('spoji_artikle', [id_skladista])
+                output_params = cursor.stored_results()
+                for result in output_params:
+                    for row in result.fetchall():
+                        print(row)
+        
+    elif a == "5." or a == "5":
+         menu_upiti()
+
+    menu()
+        
+        
+        
+        
+    
+
+menu()
