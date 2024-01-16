@@ -6,7 +6,9 @@ Sustav za upravljanje skladištem
 
 Tim - 4
 **Izradili**: Atila Astaloš, Ivan Maurović, Toni Mijić, Mateo Smoljan, Robert Vidaković
+
 **Kolegij**: Baze podataka 2
+
 **Mentor**: doc.dr.sc Goran Oreški
 --- 
 
