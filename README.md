@@ -10,7 +10,7 @@ Tim - 4
 **Kolegij**: Baze podataka 2
 
 **Mentor**: doc.dr.sc Goran Oreški
---- 
+
 
 ## Uvod
 Za projekt iz kolegija Baze podataka 2, pod mentorstvom doc.dr.sc. Gorana Oreškog, izradili smo bazu podataka za skladište. Osnova ovoga rada je utemeljena na sustavu za upravljanje skladištem. 
